@@ -302,6 +302,11 @@ export default function ChatPage() {
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogItems, setCatalogItems] = useState<Array<{ id: string; nome: string; descricao?: string | null; valor?: number | null; image_url?: string | null }>>([]);
   const [catalogSelected, setCatalogSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!empresaId || !selectedContact?.id) return;
+    window.dispatchEvent(new CustomEvent('system_notifications:mark_read', { detail: { contatoId: selectedContact.id } }));
+  }, [empresaId, selectedContact?.id]);
   const [slashQuickIndex, setSlashQuickIndex] = useState(0);
   const [replyTo, setReplyTo] = useState<Mensagem | null>(null);
   const [forwardOpen, setForwardOpen] = useState(false);

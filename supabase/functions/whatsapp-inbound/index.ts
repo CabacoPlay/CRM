@@ -27,6 +27,62 @@ function applyGreetingTemplate(greeting: string, pushName: string) {
     .replace(/\*?nome do cliente\*?/gi, name);
 }
 
+function normalizeDisplayName(value: string) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function digitsOnly(value: string) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function deriveContatoNome(args: {
+  rjid: string;
+  fromMe: boolean;
+  pushName?: string | null;
+  bodyNomeContato?: string | null;
+}) {
+  const phone = digitsOnly(args.rjid) || "Sem nome";
+  if (args.fromMe) return phone;
+
+  const push = normalizeDisplayName(args.pushName || "");
+  if (push && push.toLowerCase() !== "contato" && push.toLowerCase() !== "cliente") return push;
+
+  const bodyNome = normalizeDisplayName(args.bodyNomeContato || "");
+  if (bodyNome && bodyNome.toLowerCase() !== "contato" && bodyNome.toLowerCase() !== "cliente") return bodyNome;
+
+  return phone;
+}
+
+function shouldUpdateContatoNome(args: {
+  currentNome: string | null | undefined;
+  newNome: string;
+  rjid: string;
+  bodyNomeContato?: string | null;
+}) {
+  const cur = normalizeDisplayName(args.currentNome || "");
+  const next = normalizeDisplayName(args.newNome || "");
+  if (!next) return false;
+  if (cur === next) return false;
+
+  const phone = digitsOnly(args.rjid);
+  const bodyNome = normalizeDisplayName(args.bodyNomeContato || "");
+
+  const curLower = cur.toLowerCase();
+  const bodyLower = bodyNome.toLowerCase();
+
+  const looksAuto =
+    !cur ||
+    curLower === "contato" ||
+    curLower === "cliente" ||
+    (phone && cur === phone) ||
+    (bodyLower && curLower === bodyLower);
+
+  return looksAuto;
+}
+
 function parseDataUrlBase64(input: string) {
   const src = String(input || "");
   if (!src.startsWith("data:")) return { mimetype: null as string | null, base64: src };
@@ -1366,7 +1422,8 @@ Deno.serve(async (req: Request) => {
         const extId = key?.id as string | undefined;
         const fromMe = Boolean(key?.fromMe);
         const rjid = remoteJid || key?.remoteJid;
-        const pushName = m?.pushName || nomeContato;
+        const pushName = m?.pushName;
+        const contatoNome = deriveContatoNome({ rjid, fromMe, pushName, bodyNomeContato: nomeContato });
         const content =
           texto ||
           msgInner?.conversation ||
@@ -1404,13 +1461,14 @@ Deno.serve(async (req: Request) => {
         {
           const { data: c1 } = await supabase
             .from("contatos")
-            .select("id, atendimento_mode, profile_img_url, profile_img_fetched_at, after_hours_last_sent_at, ai_session_id, ai_session_updated_at, ai_session_closed_at")
+            .select("id, nome, atendimento_mode, profile_img_url, profile_img_fetched_at, after_hours_last_sent_at, ai_session_id, ai_session_updated_at, ai_session_closed_at")
             .eq("empresa_id", empresaId)
             .eq("contato", rjid)
             .limit(1)
             .maybeSingle();
           if (c1?.id) {
             contatoId = c1.id as string;
+            const currentContatoNome = (c1.nome as string | null | undefined) || null;
             profileImgUrl = (c1.profile_img_url as string | null | undefined) || null;
             profileFetchedAt = (c1.profile_img_fetched_at as string | null | undefined) || null;
             afterHoursLastSentAt = (c1.after_hours_last_sent_at as string | null | undefined) || null;
@@ -1421,11 +1479,17 @@ Deno.serve(async (req: Request) => {
               .from("contatos")
               .update({ updated_at: new Date().toISOString(), conexao_id: conexaoId } as any)
               .eq("id", contatoId);
+            if (!fromMe && shouldUpdateContatoNome({ currentNome: currentContatoNome, newNome: contatoNome, rjid, bodyNomeContato: nomeContato })) {
+              await supabase
+                .from("contatos")
+                .update({ nome: contatoNome } as any)
+                .eq("id", contatoId);
+            }
           } else {
             const { data: c2, error: e2 } = await supabase
               .from("contatos")
               .insert({
-                nome: pushName,
+                nome: contatoNome,
                 contato: rjid,
                 empresa_id: empresaId,
                 resumo: "",

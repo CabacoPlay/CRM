@@ -22,6 +22,9 @@ interface SystemNotification {
   createdAt: string;
   read: boolean;
   type: NotificationType;
+  meta?: {
+    contatoId?: string;
+  };
 }
 
 type MensagemRow = {
@@ -88,6 +91,24 @@ export function SystemNotifications() {
   useEffect(() => {
     setUnreadCount(notifications.filter(n => !n.read).length);
   }, [notifications]);
+
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const e = evt as CustomEvent<{ contatoId?: string }>;
+      const contatoId = String(e.detail?.contatoId || '').trim();
+      if (!contatoId) return;
+      setNotifications(prev =>
+        prev.map(n => {
+          if (n.read) return n;
+          if (n.type !== 'message') return n;
+          if (n.meta?.contatoId && n.meta.contatoId !== contatoId) return n;
+          return { ...n, read: true };
+        })
+      );
+    };
+    window.addEventListener('system_notifications:mark_read', handler as EventListener);
+    return () => window.removeEventListener('system_notifications:mark_read', handler as EventListener);
+  }, []);
 
   useEffect(() => {
     try {
@@ -170,7 +191,8 @@ export function SystemNotifications() {
             description: `${contactName}: ${preview || 'Mensagem recebida.'}`,
             createdAt: msg.created_at || new Date().toISOString(),
             read: false,
-            type: 'message'
+            type: 'message',
+            meta: { contatoId: msg.contato_id }
           });
         }
       )
