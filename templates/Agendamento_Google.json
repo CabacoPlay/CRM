@@ -1,0 +1,1669 @@
+{
+  "name": "Agendamento Google | Youtube",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "eventId": "={{ $json.id_evento }}",
+        "options": {
+          "sendUpdates": "all"
+        }
+      },
+      "id": "7b21207b-09be-4e33-9e69-0c090405f33f",
+      "name": "Deletar agendamento",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        440
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7f842ffa-cd8f-40ab-a0a7-40dc173357a7",
+              "name": "response",
+              "value": "Informe o usuário que o agendamento foi cancelado e que estará sempre à disposição para um novo agendamento.",
+              "type": "string"
+            },
+            {
+              "id": "a760b709-8b16-4b56-a672-2ffde8549cb8",
+              "name": "cancelado",
+              "value": "={{ $json.success }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e357d1e1-7db3-447a-a314-569c3fc4fa8e",
+      "name": "Informar IA sobre cancelamento",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        920,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Chame esta TOOL após o usuário informar que dedeseja cancelar um agendamento, peça email\n\n\nNa variável \"email\" você vai preencher o email do usuário",
+        "workflowId": {
+          "__rl": true,
+          "value": "7A8EQWW8p2Qc5puu",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tipo_evento": "cancelamento",
+            "email": "={{ $fromAI(\"email\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "conversationStory": "={{ $fromAI('conversationStory', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo_evento",
+              "displayName": "tipo_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "horario",
+              "displayName": "horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "conversationStory",
+              "displayName": "conversationStory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -340
+      ],
+      "id": "d208e641-2d05-4ca1-823e-d3d894592d99",
+      "name": "cancelar_reuniao"
+    },
+    {
+      "parameters": {
+        "content": "# Agendamento",
+        "height": 80,
+        "width": 283,
+        "color": 5
+      },
+      "id": "e4a6dee9-5fe9-4e49-8011-4658e2e9cf71",
+      "name": "Sticky Note15",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "description": "CHAME ESTA TOOL PARA sempre que precisar conferir a DISPONIBILIDADE na agenda antes de agendar qualquer cliente e encontrar horários disponíveis.\n\nRegras:\nTraga apenas os horários disponíveis entre 09:00 e 18:00.\n\nConsidere os horários já ocupados e não marque nenhum agendamento nesses intervalos.\n\nRetorne exatamente 4 horários disponíveis por dia, considerando 3 dias diferentes.",
+        "workflowId": {
+          "__rl": true,
+          "value": "7A8EQWW8p2Qc5puu",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nome": "={{ $fromAI(\"nome\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "email": "={{ $fromAI(\"email\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "horario": "={{ $fromAI(\"hora\",\"hora que usuário deseja realizar atendimento\",\"string\",\"\")}}",
+            "tipo_evento": "disponibilidade",
+            "conversationStory": "={{ $fromAI('conversationStory', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo_evento",
+              "displayName": "tipo_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "horario",
+              "displayName": "horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversationStory",
+              "displayName": "conversationStory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        20,
+        -340
+      ],
+      "id": "95454048-e89c-46e4-ba62-81551a249205",
+      "name": "disponibilidade"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n      \"nome\": \"\",\n      \"email\": \"\",\n      \"tipo_evento\": \"\",\n      \"horario\": \"\",\n      \"conversationStory\": \"\"\n    }"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        440
+      ],
+      "id": "6db1e2ec-7886-42e7-9254-111376069888",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "description": "Chame esta ferramenta após o usuário informar nome e numero e data do agendamento. \n\nNa variável \"nome\", você vai preencher o nome do usuário\n\nNa variável \"email\" você vai preencher o numero do usuário\n\nNa variável \"dia\" você vai preencher o dia desejado que ele tem mais facilidade em fazer a call\n\nNa variável \"histórico\" você vai subir o histórico das ultimas 3 mensagens.\n\n\nA data do agendamento você vai transformar para seguinte formato, exemplo: dd/mm/yyyy HH:MM:SS -03:00\n\nEm seguida você vai inserir o horário de agendamento na variável \"horario\"",
+        "workflowId": {
+          "__rl": true,
+          "value": "7A8EQWW8p2Qc5puu",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tipo_evento": "agendamento",
+            "nome": "={{ $fromAI(\"nome\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "email": "={{ $fromAI(\"email\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "horario": "={{ $fromAI(\"hora\",\"hora que usuário deseja realizar atendimento\",\"string\",\"\")}}",
+            "conversationStory": "={{ $fromAI('conversationStory', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo_evento",
+              "displayName": "tipo_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "horario",
+              "displayName": "horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversationStory",
+              "displayName": "conversationStory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -340
+      ],
+      "id": "bdbe9b73-a0a2-48e0-aa65-0dcc6297a95a",
+      "name": "criar_reuniao"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pegando os valores do input do n8n\nconst inputData = $input.first().json;\nconst startDateTime = inputData.start.dateTime;\nconst endDateTime = inputData.end.dateTime;\n// --- DADOS ADICIONAIS ---\nconst linkCall = inputData.hangoutLink || \"Link não disponível\"; // Pega o link da call\nconst assunto = inputData.summary || \"Assunto não disponível\";    // Pega o assunto do evento\n\n// --- LÓGICA DE DATA E HORA COM CORREÇÃO DE FUSO (SEM ALTERAÇÃO) ---\n\n// Função auxiliar para parsear a string de data, tratando os números como se fossem UTC\nfunction parseISOAsUTC(isoString) {\n  if (!isoString) return new Date(NaN);\n  const cleanISO = isoString.substring(0, 19);\n  return new Date(cleanISO + 'Z');\n}\n\n// Criando objetos Date usando nossa função segura\nconst dataInicio = parseISOAsUTC(startDateTime);\nconst dataFim = parseISOAsUTC(endDateTime);\n\n// Array com os dias da semana em português\nconst diasDaSemana = [\"domingo\", \"segunda-feira\", \"terça-feira\", \"quarta-feira\", \"quinta-feira\", \"sexta-feira\", \"sábado\"];\n\n// Verificação para garantir que a data é válida antes de formatar\nif (isNaN(dataInicio.getTime())) {\n  return [{ json: { output: \"Erro: Data de início inválida.\" } }];\n}\n\n// Extraindo e formatando usando os métodos getUTC* para ler os valores corretos\nconst diaSemana = diasDaSemana[dataInicio.getUTCDay()];\nconst dia = String(dataInicio.getUTCDate()).padStart(2, '0');\nconst mes = String(dataInicio.getUTCMonth() + 1).padStart(2, '0');\nconst ano = dataInicio.getUTCFullYear();\nconst dataFormatada = `${diaSemana}, ${dia}/${mes}/${ano}`;\n\nconst horaInicio = String(dataInicio.getUTCHours()).padStart(2, '0');\nconst minutoInicio = String(dataInicio.getUTCMinutes()).padStart(2, '0');\nconst horarioInicio = `${horaInicio}:${minutoInicio}`;\n\nconst horaFim = String(dataFim.getUTCHours()).padStart(2, '0');\nconst minutoFim = String(dataFim.getUTCMinutes()).padStart(2, '0');\nconst horarioFim = `${horaFim}:${minutoFim}`;\n\n// --- MONTAGEM DA SAÍDA FINAL ---\n\n// Monta a string de horário completa, incluindo o fuso horário para clareza\nconst horarioDataCompleto = `${dataFormatada} da ${horarioInicio} às ${horarioFim}`;\n\n// Monta a mensagem de saída final no formato desejado\nconst output = `\nHorário e Data: ${horarioDataCompleto}\n\nLink da Call: ${linkCall}\n\nAssunto: ${assunto}\n`;\n\n// Retorna o JSON com a mensagem final pronta\nreturn [{ json: { output } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        640
+      ],
+      "id": "4389640c-7945-45d8-9be5-8918904b2360",
+      "name": "Saida"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- FUNÇÕES AUXILIARES ---\n\n// Função \"inteligente\" que lida com os formatos DD/MM/YYYY e YYYY-MM-DD\nfunction parseDataInteligente(dataString) {\n  if (!dataString || typeof dataString !== 'string') return new Date(NaN);\n  \n  let dia, mes, ano, horas, minutos, segundos;\n  const dataComEspaco = dataString.replace('T', ' ');\n  const [datePart, timePart] = dataComEspaco.split(' ')[0] + ' ' + dataComEspaco.split(' ')[1].split('-')[0];\n  \n  const [data, hora] = dataComEspaco.split(' ');\n  const [dateOnly] = data.split('T');\n\n  if (dateOnly.includes('/')) {\n    [dia, mes, ano] = dateOnly.split('/').map(Number);\n  } else {\n    [ano, mes, dia] = dateOnly.split('-').map(Number);\n  }\n  \n  [horas, minutos, segundos] = hora.split(':').map(Number);\n  return new Date(ano, mes - 1, dia, horas, minutos, segundos || 0);\n}\n\n// Função que formata a data para o padrão Google (ISO 8601), corrigindo o fuso\nfunction formatToGoogleStandard(data) {\n  if (isNaN(data.getTime())) return null;\n\n  const ano = data.getFullYear();\n  const mes = String(data.getMonth() + 1).padStart(2, '0');\n  const dia = String(data.getDate()).padStart(2, '0');\n  const horas = String(data.getHours()).padStart(2, '0');\n  const minutos = String(data.getMinutes()).padStart(2, '0');\n  const segundos = \"00\";\n  \n  return `${ano}-${mes}-${dia}T${horas}:${minutos}:${segundos}-03:00`;\n}\n\n// --- DADOS DO NOVO AGENDAMENTO (pegos uma única vez) ---\n\nconst dadosAgendamento = $('DadosAgendamento').first().json;\nconst novoHorarioInicioStr = dadosAgendamento.horarioAgendamento;\nconst tempoReuniaoMinutos = dadosAgendamento.tempoReuniao;\n\n// Parseia e calcula as datas para o NOVO agendamento\nconst dataInicioNovo = parseDataInteligente(novoHorarioInicioStr);\nconst dataFimNovo = new Date(dataInicioNovo);\ndataFimNovo.setMinutes(dataFimNovo.getMinutes() + tempoReuniaoMinutos);\n\n// Formata as datas do NOVO agendamento\nconst inicioNovoAgendamento = formatToGoogleStandard(dataInicioNovo);\nconst fimNovoAgendamento = formatToGoogleStandard(dataFimNovo);\n\n\n// --- PROCESSAMENTO DOS EVENTOS ANTIGOS (DENTRO DO LOOP) ---\n\nconst results = [];\n\nfor (const item of items) {\n  try {\n    // Verifica se os valores do evento ANTIGO existem\n    if (!item.json.horario_ocupado_start || !item.json.horario_ocupado_end) {\n      throw new Error(\"Horário do evento antigo não disponível\");\n    }\n\n    // Pega os dados do evento ANTIGO\n    const startDateTimeAntigo = item.json.horario_ocupado_start;\n    const endDateTimeAntigo = item.json.horario_ocupado_end;\n    const eventId = item.json.id_evento_calendar || \"ID não disponível\";\n    const eventStatus = item.json.id_evento_calendar_status || \"Status não disponível\";\n    \n    // Formata as datas do evento ANTIGO (sem alteração na lógica)\n    const inicioAntigoFormatado = formatToGoogleStandard(parseDataInteligente(startDateTimeAntigo));\n    const fimAntigoFormatado = formatToGoogleStandard(parseDataInteligente(endDateTimeAntigo));\n\n    if (!inicioAntigoFormatado || !fimAntigoFormatado) {\n      throw new Error(\"Falha ao formatar data do evento antigo.\");\n    }\n    \n    const emailAttendList = typeof item.json.email_attend === \"string\" \n      ? JSON.parse(item.json.email_attend) \n      : item.json.email_attend;\n    const email = emailAttendList?.[0]?.email || \"E-mail não disponível\";\n\n    // Adiciona TODOS os dados (antigos e novos) ao resultado final\n    results.push({\n      json: {\n        email: email,\n        horario_agendado_inicio: inicioAntigoFormatado, // Horário antigo\n        horario_agendado_fim: fimAntigoFormatado,       // Horário antigo\n        id_evento: eventId,\n        status_evento: eventStatus,\n        // --- NOVAS SAÍDAS ADICIONADAS AQUI ---\n        inicioNovoAgendamento: inicioNovoAgendamento, // Horário novo\n        fimNovoAgendamento: fimNovoAgendamento,     // Horário novo\n      }\n    });\n\n  } catch (error) {\n    results.push({\n      json: {\n        // ... bloco de erro sem alteração, mas adicionando os campos novos como nulos\n        email: \"E-mail não disponível\",\n        horario_agendado_inicio: \"Data inválida\",\n        horario_agendado_fim: \"Data inválida\",\n        id_evento: \"ID não disponível\",\n        status_evento: \"Status não disponível\",\n        inicioNovoAgendamento: null,\n        fimNovoAgendamento: null,\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        640
+      ],
+      "id": "5c55224f-b3c5-41eb-8680-d52cd467d95b",
+      "name": "Formata reagendamento"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3605f2eb-2f0f-4460-8981-48aa75d099d8",
+              "name": "horario_ocupado_start",
+              "value": "={{ $json.start.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "84741ba8-f1fa-45ff-81cb-79dd151d8426",
+              "name": "horario_ocupado_end",
+              "value": "={{ $json.end.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "7a30a813-51b2-4da3-832b-96e60ad659e0",
+              "name": "id_evento_calendar",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a8ea4678-04d9-42f4-8553-2fb1493cc45f",
+              "name": "id_evento_calendar_status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "33d4d396-d1f4-4b1b-a58e-a8c6ec0dde5c",
+              "name": "email_attend",
+              "value": "={{ $json.attendees }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        640
+      ],
+      "id": "cb921af2-858e-435b-8db4-6442d44ba733",
+      "name": "Normaliza re-agendamento"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pegando os valores do input do n8n\nconst inputData = $input.first().json;\nconst startDateTime = inputData.start.dateTime; // Ex: \"2025-07-15T18:00:00-03:00\"\nconst endDateTime = inputData.end.dateTime;\nconst linkCall = inputData.hangoutLink || \"Link não disponível\"; // Pega o link da call\nconst assunto = inputData.summary || \"Assunto não disponível\";    // Pega o assunto do evento\n\n// --- LÓGICA DE DATA E HORA COM CORREÇÃO DE FUSO ---\n\n// Função auxiliar para interpretar a string de data como UTC, ignorando a conversão do servidor\nfunction parseISOAsUTC(isoString) {\n  if (!isoString) return new Date(NaN);\n  // Pega apenas a parte \"YYYY-MM-DDTHH:MM:SS\" e adiciona 'Z' para tratar como UTC\n  const cleanISO = isoString.substring(0, 19);\n  return new Date(cleanISO + 'Z');\n}\n\n// Criando objetos Date usando nossa função segura\nconst dataInicio = parseISOAsUTC(startDateTime);\nconst dataFim = parseISOAsUTC(endDateTime);\n\n// Array com os dias da semana em português\nconst diasDaSemana = [\"domingo\", \"segunda-feira\", \"terça-feira\", \"quarta-feira\", \"quinta-feira\", \"sexta-feira\", \"sábado\"];\n\n// Verificação para garantir que a data é válida antes de formatar\nif (isNaN(dataInicio.getTime())) {\n  return [{ json: { output: \"Erro: Data de início inválida.\" } }];\n}\n\n// Extraindo e formatando usando os métodos getUTC* para pegar os valores corretos\nconst diaSemana = diasDaSemana[dataInicio.getUTCDay()];\nconst dia = String(dataInicio.getUTCDate()).padStart(2, '0');\nconst mes = String(dataInicio.getUTCMonth() + 1).padStart(2, '0');\nconst ano = dataInicio.getUTCFullYear();\nconst dataFormatada = `${diaSemana}, ${dia}/${mes}/${ano}`;\n\nconst horaInicio = String(dataInicio.getUTCHours()).padStart(2, '0');\nconst minutoInicio = String(dataInicio.getUTCMinutes()).padStart(2, '0');\nconst horarioInicio = `${horaInicio}:${minutoInicio}`;\n\nconst horaFim = String(dataFim.getUTCHours()).padStart(2, '0');\nconst minutoFim = String(dataFim.getUTCMinutes()).padStart(2, '0');\nconst horarioFim = `${horaFim}:${minutoFim}`;\n\n// --- MONTAGEM DA SAÍDA FINAL ---\n\n// Monta a string de horário completa, incluindo o fuso horário\nconst horarioDataCompleto = `${dataFormatada} da ${horarioInicio} às ${horarioFim}`;\n\n// Monta a mensagem de saída final no formato desejado\nconst output = `\nHorário e Data: ${horarioDataCompleto}\n\nLink da Call: ${linkCall}\n\nAssunto: ${assunto}\n`;\n\n// Retorna o JSON com a mensagem final pronta\nreturn [{ json: { output } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        260
+      ],
+      "id": "2d8b1d3b-3dc3-4c7f-80ed-ef949f9e239f",
+      "name": "formata saida agendamento"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "start": "={{ $json.inicio_hora }}",
+        "end": "={{ $json.final_hora }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $('DadosAgendamento').item.json.email }}"
+          ],
+          "conferenceDataUi": {
+            "conferenceDataValues": {
+              "conferenceSolution": "hangoutsMeet"
+            }
+          },
+          "description": "Nesta call de 1 hora, você vai receber um plano estruturado de como aplicar e estruturar sua inteligência artificial. ",
+          "sendUpdates": "all",
+          "summary": "=Call de Estruturação com {{ $('DadosAgendamento').item.json.nome }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        280,
+        260
+      ],
+      "id": "c9fb3456-f10f-44b3-aece-c0a4d458846b",
+      "name": "Marca Agendamento",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3605f2eb-2f0f-4460-8981-48aa75d099d8",
+              "name": "horario_ocupado_start",
+              "value": "={{ $json.start.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "84741ba8-f1fa-45ff-81cb-79dd151d8426",
+              "name": "horario_ocupado_end",
+              "value": "={{ $json.end.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "7a30a813-51b2-4da3-832b-96e60ad659e0",
+              "name": "id_evento_calendar",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a8ea4678-04d9-42f4-8553-2fb1493cc45f",
+              "name": "id_evento_calendar_status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        60
+      ],
+      "id": "571fa5bd-e3e0-4ba2-acbb-47a23d61d57b",
+      "name": "Normalizador"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "97c06112-5669-4101-bea8-bb8cf01f7900",
+              "name": "inicioAtendimento",
+              "value": 9,
+              "type": "number"
+            },
+            {
+              "id": "3a5ac965-e0d8-4e4f-8ae1-3cd5d5c736c2",
+              "name": "fimAtendimento",
+              "value": 18,
+              "type": "number"
+            },
+            {
+              "id": "f6e9def4-6063-4891-95f9-481f02d86351",
+              "name": "intervalo",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "51a0134e-048b-40bb-96b3-ded22b9de28a",
+              "name": "tempoReuniao",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "0fe64eb3-1a33-415c-8be5-d528066c0af5",
+              "name": "nome",
+              "value": "={{ $json.nome }}",
+              "type": "string"
+            },
+            {
+              "id": "981f072d-da6a-44ab-bd67-f1cbb70c4d44",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "fdff829c-e73a-46ba-9bf4-62983113312c",
+              "name": "tipoEvento",
+              "value": "={{ $json.tipo_evento }}",
+              "type": "string"
+            },
+            {
+              "id": "f49e2f45-273f-4efb-898d-61b2693cde45",
+              "name": "horarioAgendamento",
+              "value": "={{ $json.horario }}",
+              "type": "string"
+            },
+            {
+              "id": "12f85ee0-3efe-435c-b699-7ddf6198ecb3",
+              "name": "conversationStory",
+              "value": "={{ $json.conversationStory }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        440
+      ],
+      "id": "6f243502-d3a3-4a3e-93db-8adbf79631c3",
+      "name": "DadosAgendamento"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "query": "={{ $('DadosAgendamento').item.json.email }}"
+        }
+      },
+      "id": "15de9137-5f73-41fb-ad88-7e6730ca541f",
+      "name": "Busca Eventos",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        440
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "eventId": "={{ $('Buscar Eventos1').item.json.id }}",
+        "useDefaultReminders": false,
+        "updateFields": {
+          "description": "Nesta call de 1 hora, você vai receber um plano estruturado de como aplicar e estruturar sua inteligência artificial. ",
+          "end": "={{ $json.fimNovoAgendamento }}",
+          "sendUpdates": "all",
+          "start": "={{ $json.inicioNovoAgendamento }}",
+          "summary": "=Call de Estruturação com {{ $('DadosAgendamento').item.json.nome }}"
+        },
+        "remindersUi": {
+          "remindersValues": [
+            {
+              "method": "email",
+              "minutes": 20
+            }
+          ]
+        }
+      },
+      "id": "b99cdbc1-20c2-481e-8188-4a94a9d0750d",
+      "name": "Update an event1",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        640
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tipoEvento }}",
+                    "rightValue": "disponibilidade",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5e62fcec-420e-4836-b90c-ce64ce635123"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DISPONIBILIDADE"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "37d8d342-94a6-4776-ac77-e6f4c15f032f",
+                    "leftValue": "={{ $json.tipoEvento }}",
+                    "rightValue": "agendamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AGENDAMENTO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8a8c56bc-a487-4e01-ae0d-f9d4c376d76b",
+                    "leftValue": "={{ $json.tipoEvento }}",
+                    "rightValue": "cancelamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CANCELAMENTO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "60282e4d-0e18-406a-a9c8-d725f4c3cd68",
+                    "leftValue": "={{ $json.tipoEvento }}",
+                    "rightValue": "reagendamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "REAGENDAMENTO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "553de134-e05b-485e-9166-9dc7604fc704",
+                    "leftValue": "={{ $json.tipoEvento }}",
+                    "rightValue": "realizado",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AGENDAMENTO MARCADO"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "adf6db0f-70a8-4226-abfb-6e45a3e3452f",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of items) {\n  try {\n    // Verifica se os valores existem\n    if (!item.json.horario_ocupado_start || !item.json.horario_ocupado_end) {\n      throw new Error(\"Horário não disponível\");\n    }\n\n    // Pegando os valores do JSON\n    const startDateTime = item.json.horario_ocupado_start; // Exemplo: \"2025-06-03T08:35:00-03:00\"\n    const endDateTime = item.json.horario_ocupado_end;\n    const eventId = item.json.id_evento_calendar || \"ID não disponível\";\n    const eventStatus = item.json.id_evento_calendar_status || \"Status não disponível\";\n    \n    // Extraindo e-mails dos participantes (converte string JSON para objeto, se necessário)\n    const emailAttendList = typeof item.json.email_attend === \"string\" \n      ? JSON.parse(item.json.email_attend) \n      : item.json.email_attend;\n    \n    // Pega o primeiro e-mail da lista, se houver\n    const email = emailAttendList?.[0]?.email || \"E-mail não disponível\";\n\n    // Função para formatar a data corretamente para \"dd/MM/yyyy HH:mm\" com fuso de São Paulo\n    function formatDateTime(isoString) {\n      if (!isoString) return \"Data inválida\"; // Caso a data seja nula ou indefinida\n\n      const date = new Date(isoString);\n      const opcoesFuso = { timeZone: \"America/Sao_Paulo\", hour12: false };\n      const dateBrasil = new Date(date.toLocaleString(\"en-US\", opcoesFuso));\n\n      if (isNaN(dateBrasil.getTime())) {\n        console.log(\"Erro ao converter data:\", isoString); // Debugging\n        return \"Data inválida\"; // Caso a conversão falhe\n      }\n\n      const day = String(dateBrasil.getDate()).padStart(2, '0');\n      const month = String(dateBrasil.getMonth() + 1).padStart(2, '0'); // Mês começa do 0\n      const year = dateBrasil.getFullYear();\n      const hours = String(dateBrasil.getHours()).padStart(2, '0');\n      const minutes = String(dateBrasil.getMinutes()).padStart(2, '0');\n\n      return `${day}/${month}/${year} ${hours}:${minutes}`;\n    }\n\n    // Formata as datas corretamente\n    const startFormatted = formatDateTime(startDateTime);\n    const endFormatted = formatDateTime(endDateTime);\n\n    // Adiciona os dados formatados ao resultado final\n    results.push({\n      json: {\n        email: email, // Exemplo: \"usuario@example.com\"\n        horario_agendado_inicio: startFormatted, // Exemplo: \"03/06/2025 08:35\"\n        horario_agendado_fim: endFormatted, // Exemplo: \"03/06/2025 08:35\"\n        id_evento: eventId, // Exemplo: \"cos92fmvp9dqk9q69b5o6q48o8\"\n        status_evento: eventStatus // Exemplo: \"confirmed\"\n      }\n    });\n\n  } catch (error) {\n    console.log(\"Erro ao processar item:\", error.message); // Debugging\n\n    // Em caso de erro, retorna valores padrão\n    results.push({\n      json: {\n        email: \"E-mail não disponível\",\n        horario_agendado_inicio: \"Data inválida\",\n        horario_agendado_fim: \"Data inválida\",\n        id_evento: \"ID não disponível\",\n        status_evento: \"Status não disponível\"\n      }\n    });\n  }\n}\n\n// Retorna os dados formatados para o próximo nó no n8n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        440
+      ],
+      "id": "de8d3b03-7d56-4def-8c7d-9c2b540ff677",
+      "name": "Code7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pegando os valores do input do n8n de forma correta\nconst inputData = $('DadosAgendamento').first().json;\n\nconst conversationStory = inputData.conversationStory; // Mensagem do usuário\nconst horario = inputData.horarioAgendamento;          // Data vinda do input\nconst tempoReuniaoMinutos = inputData.tempoReuniao;    // Duração da reunião em minutos\n\n// Função \"inteligente\" para parsear a data, que lida com AMBOS os formatos\nfunction parseDataBr(dataString) {\n    if (!dataString || typeof dataString !== 'string') {\n      // Retorna uma data inválida se a entrada for nula ou não for uma string\n      return new Date(NaN);\n    }\n    \n    // Variáveis que vamos preencher\n    let dia, mes, ano, horas, minutos, segundos;\n\n    // Normaliza a string, trocando 'T' por espaço, caso exista\n    const dataComEspaco = dataString.replace('T', ' ');\n\n    // Separa a string em \"parte da data\" e \"parte da hora\"\n    const dataLimpa = dataComEspaco.split(' ')[0] + ' ' + dataComEspaco.split(' ')[1];\n    const [datePart, timePart] = dataLimpa.split(' ');\n\n    // ----- A TRATATIVA ESTÁ AQUI -----\n    // Detecta o formato da data pelo separador\n    if (datePart.includes('/')) {\n      // Formato é DD/MM/YYYY\n      [dia, mes, ano] = datePart.split('/').map(Number);\n    } else {\n      // Formato é YYYY-MM-DD\n      [ano, mes, dia] = datePart.split('-').map(Number);\n    }\n    // --------------------------------\n\n    // A parte da hora é igual para ambos os formatos\n    [horas, minutos, segundos] = timePart.split(':').map(Number);\n\n    // mes - 1 porque em JavaScript os meses começam em 0\n    return new Date(ano, mes - 1, dia, horas, minutos, segundos || 0);\n}\n\n// Criando um objeto Date a partir da string recebida\nconst dataInicio = parseDataBr(horario);\n\n// Criando uma nova data para o horário de encerramento (endDate)\nconst dataEncerramento = new Date(dataInicio);\ndataEncerramento.setMinutes(dataEncerramento.getMinutes() + tempoReuniaoMinutos);\n\n// Formatando as datas no formato ISO 8601\nconst formatarISOComFuso = (data) => {\n    if (isNaN(data.getTime())) {\n      return 'NaN-NaN-NaNTNaN:NaN:00-03:00';\n    }\n    const ano = data.getFullYear();\n    const mes = String(data.getMonth() + 1).padStart(2, '0');\n    const dia = String(data.getDate()).padStart(2, '0');\n    const horas = String(data.getHours()).padStart(2, '0');\n    const minutos = String(data.getMinutes()).padStart(2, '0');\n    const segundos = \"00\";\n    const fusoHorario = \"-03:00\";\n\n    return `${ano}-${mes}-${dia}T${horas}:${minutos}:${segundos}${fusoHorario}`;\n};\n\n// Criando as strings formatadas\nconst startDate = formatarISOComFuso(dataInicio);\nconst endDate = formatarISOComFuso(dataEncerramento);\n\n// Retornando os dados no formato esperado\nreturn [{\n    json: {\n        mensagem: conversationStory,\n        inicio_hora: startDate,\n        final_hora: endDate\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        60,
+        260
+      ],
+      "id": "24cc39cf-dc7b-429b-8510-0213202bccdb",
+      "name": "Formata Entradas "
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "query": "={{ $json.email }}"
+        }
+      },
+      "id": "e9b197ac-1384-4f91-8a64-1ea4e3cffbde",
+      "name": "Buscar Eventos1",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        640
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $now.toISO() }}"
+        }
+      },
+      "id": "6625af4c-89ff-4e0f-b973-1e315271bb11",
+      "name": "Buscar Eventos",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        60
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8b62b112-ffea-4958-a8e7-308d626bc069",
+              "name": "nome",
+              "value": "Henrique",
+              "type": "string"
+            },
+            {
+              "id": "cca21769-240c-4f72-93b0-270df62a80f9",
+              "name": "telefone",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "0722ad3f-9820-4a29-aa1b-8f143a4edc58",
+              "name": "mensagem",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -220,
+        -780
+      ],
+      "id": "d117b71b-1dc9-4def-8f63-54717726f6f1",
+      "name": "Dados"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        -780
+      ],
+      "id": "606eacba-25ef-4d68-8fc2-47aef680202d",
+      "name": "When chat message received",
+      "webhookId": "e44b5b4c-3ee1-4650-ad4b-0cde7c3ae140"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When chat message received').item.json.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        100,
+        -600
+      ],
+      "id": "0230c57c-6241-4767-b46b-4529fed0520f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensagem }}",
+        "options": {
+          "systemMessage": "# 🎯 GOAL (Objetivo da IA)\nVocê é uma assistente virtual da **VorxIA**. Sua função é ser um pré-atendimento especializado, focado em realizar agendamentos.\n\n\n# TOOLS\n\n* **criar_reuniao**\n  Use quando precisar agendar uma reunião com o cliente. Sempre colete e-mail e data para usar essa ferramenta. Só é permitido agendar 1 reunião por vez de segunda a sexta, das 10h às 17h.\n\n* **reagendar_reuniao**\n  Use quando a pessoa solicitar que mude a data da reunião ou reagendar uma reunião com o cliente. Sempre colete e-mail e data para usar essa ferramenta. Faça validação se tem horario disponivel na tool **disponibilidade** antes de realizar o reagendamento.\n\n* **cancelar_reuniao**\n  Use quando precisar cancelar uma reunião com o cliente. Sempre colete e-mail e nome para usar essa ferramenta.\n\n* **disponibilidade**\n  Use quando precisar verificar disponibilidade de horario, quando cliente tiver interesse em realizar agendamento.\n\n* **agendamentoFeito**\n    Use quando precisar verificar agendamento já realizado e marcado pelo contato.\n\n# REGRAS\n\n* **Verificação**\n  Quando cliente demonstrar desejo em realizar agendamento, verifique na tool **disponibilidade** os horarios disponiveis.\n\n**. Hoario e data atual (utilize para se basear nos agendamentos): {{ $now.setLocale('pt-BR').toFormat(\"cccc, dd 'de' LLLL 'de' yyyy, HH:mm\") }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        140,
+        -780
+      ],
+      "id": "d3b74abd-e90b-4b8e-8021-ffdfc12ef057",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "description": "Após o usuário informar que quer REAGENDAR ou se já tem horário, e colete o nome, email e nova data Chame esta tool\n\nNa variável \"nome\", você vai preencher o nome do usuário e na variavel \"email\" você vai preencher com email do usuário\n\nA data do agendamento você vai transformar para seguinte formato, exemplo: 2024-10-18T14:30:00-03:00 e vai preencher a variavel \"horario\"\n\nEm seguida você vai inserir uma hora a mais depois no horario de agendamento e na variavel \"end\" você vai prencher com o horario no mesmo formato da variavel start",
+        "workflowId": {
+          "__rl": true,
+          "value": "7A8EQWW8p2Qc5puu",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tipo_evento": "reagendamento",
+            "nome": "={{ $fromAI(\"nome\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "email": "={{ $fromAI(\"email\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "conversationStory": "={{ $fromAI('conversationStory', ``, 'string') }}",
+            "horario": "={{ $fromAI(\"hora\",\"hora que usuário deseja realizar atendimento\",\"string\",\"\")}}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo_evento",
+              "displayName": "tipo_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "horario",
+              "displayName": "horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversationStory",
+              "displayName": "conversationStory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        -340
+      ],
+      "id": "007c3db5-1f15-4cae-aa45-41541235fe49",
+      "name": "reagendar_reuniao"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- DADOS DOS NÓS ANTERIORES ---\n// Pega a lista de eventos (pode estar vazia)\nconst eventosOcupados = $('Normalizador').all(); \n// Pega as regras de agendamento\nconst regrasAgendamento = $('DadosAgendamento').first().json;\n\nconst inicioAtendimento = regrasAgendamento.inicioAtendimento; // Ex: 9\nconst fimAtendimento = regrasAgendamento.fimAtendimento;     // Ex: 17\nconst intervaloPausaMinutos = regrasAgendamento.intervalo;    // Ex: 30\nconst duracaoMinutos = regrasAgendamento.tempoReuniao || 60; // Usa tempoReuniao\n\n// --- FUNÇÃO PARA FORMATAR DATAS OCUPADAS ---\n// Esta é a função \"inteligente\" que lida com múltiplos formatos\nfunction formatarDataOcupada(dataString) {\n  if (!dataString || typeof dataString !== 'string') return null;\n\n  let dia, mes, ano, horas, minutos, segundos;\n  const dataComEspaco = dataString.replace('T', ' ');\n  const [datePart, timePart] = dataComEspaco.split(' ');\n\n  if (!datePart || !timePart) return null;\n\n  if (datePart.includes('/')) {\n    [dia, mes, ano] = datePart.split('/').map(Number);\n  } else {\n    [ano, mes, dia] = datePart.split('-').map(Number);\n  }\n  \n  [horas, minutos, segundos] = timePart.split(':').map(Number);\n  \n  // Cria um objeto Date baseado em UTC para evitar conversão de fuso do servidor\n  const date = new Date(Date.UTC(ano, mes - 1, dia, horas, minutos, segundos || 0));\n\n  if (isNaN(date.getTime())) return null;\n\n  // Usa os métodos getUTC* para retornar a string no formato \"DD/MM/YYYY HH:mm\"\n  const finalDay = String(date.getUTCDate()).padStart(2, '0');\n  const finalMonth = String(date.getUTCMonth() + 1).padStart(2, '0');\n  const finalYear = date.getUTCFullYear();\n  const finalHours = String(date.getUTCHours()).padStart(2, '0');\n  const finalMinutes = String(date.getUTCMinutes()).padStart(2, '0');\n\n  return `${finalDay}/${finalMonth}/${finalYear} ${finalHours}:${finalMinutes}`;\n}\n\n// --- LÓGICA PRINCIPAL ---\n\n// 1. CRIA A LISTA DE HORÁRIOS OCUPADOS\nconst horariosOcupados = new Set();\n// Verifica se a entrada de eventos não está vazia e se o primeiro evento tem data\nif (eventosOcupados.length > 0 && eventosOcupados[0].json.horario_ocupado_start) {\n  for (const item of eventosOcupados) {\n    const horarioFormatado = formatarDataOcupada(item.json.horario_ocupado_start);\n    if (horarioFormatado) {\n      horariosOcupados.add(horarioFormatado);\n    }\n  }\n}\n// Se não houver eventos, 'horariosOcupados' simplesmente continuará vazio, que é o correto.\n\n// 2. GERA OS HORÁRIOS DISPONÍVEIS (LÓGICA DO ANTIGO 'Code12')\nconst horariosDisponiveis = {};\nconst timezone = 'America/Sao_Paulo'; \nconst agora = new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));\n\nfor (let i = 0; i < 7; i++) {\n    const dataAtualLoop = new Date(agora);\n    dataAtualLoop.setDate(agora.getDate() + i);\n\n    const diasSemana = [\"Domingo\", \"Segunda-Feira\", \"Terça-Feira\", \"Quarta-Feira\", \"Quinta-Feira\", \"Sexta-Feira\", \"Sábado\"];\n    const diaSemanaComData = `${diasSemana[dataAtualLoop.getDay()]} (${String(dataAtualLoop.getDate()).padStart(2, '0')}/${String(dataAtualLoop.getMonth() + 1).padStart(2, '0')})`;\n\n    if (diasSemana[dataAtualLoop.getDay()] === \"Sábado\" || diasSemana[dataAtualLoop.getDay()] === \"Domingo\") {\n        continue;\n    }\n\n    const dataFormatada = `${String(dataAtualLoop.getDate()).padStart(2, '0')}/${String(dataAtualLoop.getMonth() + 1).padStart(2, '0')}/${dataAtualLoop.getFullYear()}`;\n    horariosDisponiveis[diaSemanaComData] = [];\n\n    const inicioDia = new Date(dataAtualLoop);\n    inicioDia.setHours(inicioAtendimento, 0, 0, 0);\n    const fimDia = new Date(dataAtualLoop);\n    fimDia.setHours(fimAtendimento, 0, 0, 0);\n\n    let horarioInicioSlot = new Date(inicioDia);\n\n    while (horarioInicioSlot.getTime() + duracaoMinutos * 60000 <= fimDia.getTime()) {\n        if (i === 0 && horarioInicioSlot < agora) {\n            horarioInicioSlot.setMinutes(horarioInicioSlot.getMinutes() + duracaoMinutos + intervaloPausaMinutos);\n            continue;\n        }\n        \n        const horaFormatada = `${String(horarioInicioSlot.getHours()).padStart(2, '0')}:${String(horarioInicioSlot.getMinutes()).padStart(2, '0')}`;\n        const chaveOcupado = `${dataFormatada} ${horaFormatada}`;\n        \n        if (!horariosOcupados.has(chaveOcupado)) {\n            const horarioFimSlot = new Date(horarioInicioSlot.getTime() + duracaoMinutos * 60000);\n            const horarioFimFormatado = `${String(horarioFimSlot.getHours()).padStart(2, '0')}:${String(horarioFimSlot.getMinutes()).padStart(2, '0')}`;\n            horariosDisponiveis[diaSemanaComData].push(`${horaFormatada} às ${horarioFimFormatado}`);\n        }\n\n        horarioInicioSlot.setMinutes(horarioInicioSlot.getMinutes() + duracaoMinutos + intervaloPausaMinutos);\n    }\n}\n\n// 3. FORMATA A SAÍDA FINAL\nconst resultado = [];\nconst diasComVagas = Object.keys(horariosDisponiveis).filter(dia => horariosDisponiveis[dia].length > 0);\nconst diasSelecionados = diasComVagas.slice(0, 2);\n\nfor (const dia of diasSelecionados) {\n    const horarios = horariosDisponiveis[dia];\n    resultado.push(`${dia}:\\n- Horários disponíveis: ${horarios.join(\", \")}`);\n}\n\n// 4. RETORNA O JSON PARA O N8N\nreturn [{\n    json: {\n        horarios_disponiveis: resultado.join(\"\\n\\n\") || \"Desculpe, não encontramos horários disponíveis para os próximos dias.\"\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        60
+      ],
+      "id": "0d1f1b1c-2810-415d-9a04-536322026e8e",
+      "name": "Formatação agendamento"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3605f2eb-2f0f-4460-8981-48aa75d099d8",
+              "name": "horario_ocupado_start",
+              "value": "={{ $json.start.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "84741ba8-f1fa-45ff-81cb-79dd151d8426",
+              "name": "horario_ocupado_end",
+              "value": "={{ $json.end.dateTime }}",
+              "type": "string"
+            },
+            {
+              "id": "7a30a813-51b2-4da3-832b-96e60ad659e0",
+              "name": "id_evento_calendar",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a8ea4678-04d9-42f4-8553-2fb1493cc45f",
+              "name": "id_evento_calendar_status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "33d4d396-d1f4-4b1b-a58e-a8c6ec0dde5c",
+              "name": "email_attend",
+              "value": "={{ $json.attendees }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        440
+      ],
+      "id": "2bc2a7da-6a37-45b2-a0df-a4e5312f9ece",
+      "name": "NormalizadorCancelamento"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "henriquedev062@gmail.com",
+          "mode": "list",
+          "cachedResultName": "henriquedev062@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "query": "={{ $json.email }}"
+        }
+      },
+      "id": "27e131f7-e68d-4ded-bc23-c7987a7a4bf3",
+      "name": "Busca Agendamento",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        840
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "afBDjTyCtGnpSmVm",
+          "name": "Henrique dev"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Chame esta TOOL após o usuário informar que dedeseja verificar algum um agendamento ralizado, peça email\n\n\nNa variável \"email\" você vai preencher o email do usuário",
+        "workflowId": {
+          "__rl": true,
+          "value": "7A8EQWW8p2Qc5puu",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tipo_evento": "realizado",
+            "email": "={{ $fromAI(\"email\",\"email do cliente para fazer agendamento\",\"string\",\"\")}}",
+            "conversationStory": "={{ $fromAI('conversationStory', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "tipo_evento",
+              "displayName": "tipo_evento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "horario",
+              "displayName": "horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "conversationStory",
+              "displayName": "conversationStory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        -340
+      ],
+      "id": "24f50120-b8c0-45ff-bbc5-bd47a4e75b5b",
+      "name": "agendamentoFeito"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega TODOS os itens que vêm do nó anterior (ex: \"Buscar Eventos\")\nconst items = $input.all();\n\n// --- CENÁRIO 1: NÃO HÁ AGENDAMENTOS ---\n// Se o array de itens estiver vazio, significa que a busca não retornou eventos.\nif (items.length === 0) {\n  // Retorna a mensagem padrão e encerra a execução.\n  return [{\n    json: {\n      output: \"Não possui agendamento\"\n    }\n  }];\n}\n\n// --- CENÁRIO 2: EXISTEM AGENDAMENTOS ---\n\n// Array para guardar nossas mensagens formatadas\nconst results = [];\n\n// Função auxiliar para formatar a data e hora, corrigindo o fuso horário\nfunction formatarHorario(startIso, endIso) {\n  // Função interna para \"enganar\" o JS e tratar os números da string como UTC\n  function parseISOAsUTC(isoString) {\n    if (!isoString) return new Date(NaN);\n    // Pega apenas a parte \"YYYY-MM-DDTHH:MM:SS\" e adiciona 'Z' para tratar como UTC\n    const cleanISO = isoString.substring(0, 19);\n    return new Date(cleanISO + 'Z');\n  }\n\n  const dataInicio = parseISOAsUTC(startIso);\n  const dataFim = parseISOAsUTC(endIso);\n\n  if (isNaN(dataInicio.getTime()) || isNaN(dataFim.getTime())) {\n    return \"Data ou hora inválida\";\n  }\n\n  const diasDaSemana = [\"domingo\", \"segunda-feira\", \"terça-feira\", \"quarta-feira\", \"quinta-feira\", \"sexta-feira\", \"sábado\"];\n  \n  // Usa os métodos getUTC* para pegar os valores corretos\n  const diaSemana = diasDaSemana[dataInicio.getUTCDay()];\n  const dia = String(dataInicio.getUTCDate()).padStart(2, '0');\n  const mes = String(dataInicio.getUTCMonth() + 1).padStart(2, '0');\n  const ano = dataInicio.getUTCFullYear();\n  \n  const horaInicio = String(dataInicio.getUTCHours()).padStart(2, '0');\n  const minutoInicio = String(dataInicio.getUTCMinutes()).padStart(2, '0');\n  \n  const horaFim = String(dataFim.getUTCHours()).padStart(2, '0');\n  const minutoFim = String(dataFim.getUTCMinutes()).padStart(2, '0');\n  \n  // Retorna a string de data e hora formatada\n  return `Horário e Data: ${diaSemana}, ${dia}/${mes}/${ano} da ${horaInicio}:${minutoInicio} às ${horaFim}:${minutoFim}`;\n}\n\n\n// Loop para processar cada evento encontrado\nfor (const item of items) {\n  try {\n    // Pega os dados do evento atual\n    const startDateTime = item.json.start?.dateTime;\n    const endDateTime = item.json.end?.dateTime;\n    const linkCall = item.json.hangoutLink || \"Link não disponível\";\n    const assunto = item.json.summary || \"Assunto não disponível\";\n\n    // Se não houver data/hora, pula para o próximo item\n    if (!startDateTime || !endDateTime) {\n      continue;\n    }\n\n    // Formata o horário usando a nossa função auxiliar\n    const horarioFormatado = formatarHorario(startDateTime, endDateTime);\n\n    // Monta a mensagem de saída final para este evento\n    const outputString = `Agendamento marcado para: \\n${horarioFormatado}\\n\\nLink da Call: ${linkCall}\\n\\nAssunto: ${assunto}\\n`;\n\n    // Adiciona o resultado formatado ao nosso array de saídas\n    results.push({\n      json: {\n        output: outputString\n      }\n    });\n\n  } catch (error) {\n    // Caso algum evento seja mal-formado, registra o erro e continua\n    console.log(\"Erro ao processar um evento:\", error.message);\n  }\n}\n\n// Retorna todos os agendamentos formatados. \n// Se o loop não processar nada, o array 'results' estará vazio e o n8n não passará nada para frente.\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        840
+      ],
+      "id": "27883330-d8e8-46d9-8acd-f8795b571851",
+      "name": "Agendamento feito"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 1040,
+        "width": 2240,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        0
+      ],
+      "id": "07999378-d9ee-4684-abba-4465376c0438",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 260,
+        "width": 1180,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -400
+      ],
+      "id": "5a986efd-d195-471f-b1e2-ab7b01e48dad",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Tools Agendamento",
+        "height": 80,
+        "width": 263,
+        "color": 2
+      },
+      "id": "c8db5efe-5e1f-4c3f-a40c-b1f74e48cc3e",
+      "name": "Sticky Note16",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -40,
+        -600
+      ],
+      "id": "3b1b72c5-c3cb-4c13-ace2-cb0fa15b726c",
+      "name": "4o-mini",
+      "credentials": {
+        "openAiApi": {
+          "id": "eeYjyFOrekKolsbf",
+          "name": "OpenAi account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "nome": "henrique",
+          "email": "vorxia.digital@gmail.com",
+          "tipo_evento": "realizado",
+          "horario": null,
+          "conversationStory": "Usuário solicitou/verificou se tem algum agendamento marcado."
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Deletar agendamento": {
+      "main": [
+        [
+          {
+            "node": "Informar IA sobre cancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Saida": {
+      "main": [
+        []
+      ]
+    },
+    "Formata reagendamento": {
+      "main": [
+        [
+          {
+            "node": "Update an event1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliza re-agendamento": {
+      "main": [
+        [
+          {
+            "node": "Formata reagendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca Agendamento": {
+      "main": [
+        [
+          {
+            "node": "formata saida agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "DadosAgendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizador": {
+      "main": [
+        [
+          {
+            "node": "Formatação agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DadosAgendamento": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Eventos": {
+      "main": [
+        [
+          {
+            "node": "NormalizadorCancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event1": {
+      "main": [
+        [
+          {
+            "node": "Saida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Buscar Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Formata Entradas ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Busca Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Eventos1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Busca Agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code7": {
+      "main": [
+        [
+          {
+            "node": "Deletar agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formata Entradas ": {
+      "main": [
+        [
+          {
+            "node": "Marca Agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Eventos1": {
+      "main": [
+        [
+          {
+            "node": "Normaliza re-agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Eventos": {
+      "main": [
+        [
+          {
+            "node": "Normalizador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "disponibilidade": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reagendar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatação agendamento": {
+      "main": [
+        []
+      ]
+    },
+    "NormalizadorCancelamento": {
+      "main": [
+        [
+          {
+            "node": "Code7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agendamentoFeito": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Agendamento": {
+      "main": [
+        [
+          {
+            "node": "Agendamento feito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4o-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "78e240de-20f7-488a-af2a-5a5e88dd2124",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d30d907b354f66ef99b18496cf8781499b02c549bbd2be385fbb7487cecaa622"
+  },
+  "id": "7A8EQWW8p2Qc5puu",
+  "tags": [
+    {
+      "createdAt": "2025-07-11T17:55:09.824Z",
+      "updatedAt": "2025-07-11T17:55:09.824Z",
+      "id": "U7mDzmm0N6QtESu6",
+      "name": "Vorxia"
+    },
+    {
+      "createdAt": "2025-05-16T19:35:59.657Z",
+      "updatedAt": "2025-05-16T19:35:59.657Z",
+      "id": "iIT0ePoGTZv9YFmG",
+      "name": "Youtube"
+    },
+    {
+      "createdAt": "2025-06-13T19:18:18.310Z",
+      "updatedAt": "2025-06-13T19:18:18.310Z",
+      "id": "rLdivp9s7m3SrhHo",
+      "name": "Agendamento"
+    }
+  ]
+}

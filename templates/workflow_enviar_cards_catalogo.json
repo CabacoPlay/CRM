@@ -1,0 +1,24 @@
+{
+  "name": "Enviar Cards de Catálogo (imagem + legenda)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "async function toBRL(v){if(v==null)return\"\";return Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}\nfunction caption(it){const titulo=`${it.tipo==='Serviço'?'🛠️':'🛒'} ${it.nome}`.trim();const resumo=(it.descricao||'').trim();const preco=toBRL(it.valor);const linhas=[titulo];if(resumo){linhas.push('');linhas.push(resumo)}if(preco){linhas.push('');linhas.push(`💰 ${preco}`)}return linhas.join('\\n')}\nfunction safe(str){return (str||'').toString()}\nfunction guessExtFromMime(mt){mt=(mt||'').toLowerCase();if(mt.includes('jpeg'))return'jpg';if(mt.includes('png'))return'png';if(mt.includes('webp'))return'webp';if(mt.includes('gif'))return'gif';return'media'}\nconst http = this.helpers.httpRequest.bind(this.helpers);\nconst inputItems=$input.all();\nlet catalogItems=[];\nfor(const it of inputItems){const j=it.json||{};if(Array.isArray(j.response)){catalogItems.push(...j.response)}else if(Array.isArray(j.items)){catalogItems.push(...j.items)}else if(j.nome&&j.valor!=null){catalogItems.push(j)} }\nif(catalogItems.length===0){return [{json:{sent:0,reason:'no_catalog_items'}}]}\nconst MAX=3;catalogItems=catalogItems.slice(0,MAX);\nlet conn={};\ntry{const c1=$items('Obter conexão e empresa',0,0)[0]?.json||{};conn=c1.conexao||c1}catch(e){}\nif(!conn.api_url){try{const c2=$items('dados-saas',0,0)[0]?.json||{};conn=c2.conexao||c2}catch(e){}}\nconst apiUrl=safe(conn.api_url).replace(/\\/+$/,'');\nconst instance=encodeURIComponent(safe(conn.nome_api||conn.instance));\nconst apikey=safe(conn.apikey||conn.globalkey||conn.apiKey);\nlet numberRaw=safe($json.number||$json.sender||$json.contato||'');\nif(!numberRaw){try{numberRaw=safe($items('Dados',0,0)[0]?.json?.sender||$items('Dados',0,0)[0]?.json?.TelefoneRaw||'')}catch(e){}}\nconst number=numberRaw.replace(/\\D/g,'');\nif(!apiUrl||!instance||!apikey||!number){return [{json:{sent:0,reason:'missing_connection_or_number',apiUrl,instance,hasKey:Boolean(apikey),number}}]}\nlet sent=0;const results=[];\nfor(const it of catalogItems){const legend=caption(it);const imageUrl=safe(it.image_url||it.imagem_url||it.foto_url||'');\n  if(imageUrl){try{const imgRes=await http({method:'GET',url:imageUrl,resolveWithFullResponse:true,encoding:null});const ct=(imgRes.headers&& (imgRes.headers['content-type']||imgRes.headers['Content-Type']))||'image/jpeg';const base64=Buffer.from(imgRes.body).toString('base64');const ext=guessExtFromMime(ct);const payload={number,mediatype:'image',mimetype:ct,media:base64,fileName:`${(it.nome||'produto').slice(0,32)}.${ext}`,caption:legend};\n    const sendRes=await http({method:'POST',url:`${apiUrl}/message/sendMedia/${instance}`,headers:{'Content-Type':'application/json',apikey},body:payload,json:true});\n    results.push({json:{item:it.id||it.nome,status:'ok',sendRes}});sent++;continue\n  }catch(e){results.push({json:{item:it.id||it.nome,status:'image_fail',error:safe(e.message)}})} }\n  try{const sendText=await http({method:'POST',url:`${apiUrl}/message/sendText/${instance}`,headers:{'Content-Type':'application/json',apikey},body:{number,text:legend},json:true});results.push({json:{item:it.id||it.nome,status:'text_fallback',sendText}});sent++}catch(e){results.push({json:{item:it.id||it.nome,status:'fail',error:safe(e.message)}})}\n}\nreturn results.length?results:[{json:{sent}}];"
+      },
+      "id": "e6a9b5e1-1f3f-4e9c-ae8f-3c9e6a77c111",
+      "name": "Enviar Cards Catálogo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -240
+      ]
+    }
+  ],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a2d1f2d3-4c5b-6e7f-8091-a2b3c4d5e6f7"
+}

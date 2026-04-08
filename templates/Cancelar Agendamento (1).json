@@ -1,0 +1,346 @@
+{
+  "name": "Cancelar Agendamento",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "contato_cliente"
+            },
+            {
+              "name": "data_hora"
+            },
+            {
+              "name": "empresa_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        384
+      ],
+      "id": "1832f446-7788-4e4e-8c23-dbf8ba2e230c",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "today",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toISODate() }}",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "tzOffset",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toFormat('ZZ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        384
+      ],
+      "id": "prepCancelDate",
+      "name": "Preparar Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.data_hora || '';\nconst today = $json.today;\nconst tz = $json.tzOffset || '-03:00';\nfunction pad(n){return n.toString().padStart(2,'0');}\nlet normalized = input;\nconst simpleHour = input.match(/^(\\d{1,2})h$/i);\nconst hourMin = input.match(/^(\\d{1,2})h(\\d{2})$/i);\nconst colonHM = input.match(/^(\\d{1,2})(:(\\d{2}))$/);\nif (simpleHour) {\n  const h = pad(Number(simpleHour[1]));\n  normalized = `${today}T${h}:00:00${tz}`;\n} else if (hourMin) {\n  const h = pad(Number(hourMin[1]));\n  const m = pad(Number(hourMin[2]));\n  normalized = `${today}T${h}:${m}:00${tz}`;\n} else if (colonHM) {\n  const h = pad(Number(colonHM[1]));\n  const m = pad(Number(colonHM[3]));\n  normalized = `${today}T${h}:${m}:00${tz}`;\n}\nreturn [{ json: { ...$json, normalized_data_hora: normalized } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        384
+      ],
+      "id": "normCancelDate",
+      "name": "Normalizar DataHora"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n1",
+              "name": "contato_cliente",
+              "value": "={{ ($json.contato_cliente || '').replace('@s.whatsapp.net', '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        384
+      ],
+      "id": "e85f5516-52e5-457a-afb4-e0744cd7cdc5",
+      "name": "Normalizar Contato"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "agendamentos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "contato_cliente",
+              "condition": "eq",
+              "keyValue": "={{ $json.contato_cliente }}"
+            },
+            {
+              "keyName": "data_hora",
+              "condition": "eq",
+              "keyValue": "={{ $json.normalized_data_hora || $json.data_hora }}"
+            },
+            {
+              "keyName": "empresa_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.empresa_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "Cancelado"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        416,
+        384
+      ],
+      "id": "8fb97bbd-3476-4de9-8cf6-b21add97dcd8",
+      "name": "Update a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "qrZ7Lx0Vz0dtVjl0",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ok = Array.isArray($json.data) && $json.data.length > 0;\nreturn [{ json: { cancel_ok: ok } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        384
+      ],
+      "id": "3910b4c1-9fbf-4e9f-9859-6e144f921d0a",
+      "name": "AvaliarCancel"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.cancel_ok }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        384
+      ],
+      "id": "201b27ff-3fb3-476d-933f-d1da1389df50",
+      "name": "CancelOk"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "cancel_ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "mensagem",
+              "value": "Agendamento cancelado com sucesso.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        288
+      ],
+      "id": "477dac36-fd19-4c98-943e-29b12b28bd4f",
+      "name": "Resultado Cancelado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r3",
+              "name": "cancel_ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "r4",
+              "name": "mensagem",
+              "value": "Não encontrei agendamento para cancelar nesse horário.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        480
+      ],
+      "id": "b55d7318-ced1-450d-9aa3-392a36f73c23",
+      "name": "Resultado Falha"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Preparar Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Data": {
+      "main": [
+        [
+          {
+            "node": "Normalizar DataHora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar DataHora": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Contato": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "AvaliarCancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AvaliarCancel": {
+      "main": [
+        [
+          {
+            "node": "CancelOk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CancelOk": {
+      "main": [
+        [
+          {
+            "node": "Resultado Cancelado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado Falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e50cc9e4-54d0-4c23-ae14-422cd07a9911",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f0412fad1a6c8c3843eb6a404930fcbc22885095f7e8f73037797e8217b976b"
+  },
+  "id": "vvGVKY5ZcVAbTXok",
+  "tags": []
+}

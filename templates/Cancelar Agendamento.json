@@ -1,0 +1,281 @@
+{
+  "name": "Cancelar Agendamento",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "contato_cliente"
+            },
+            {
+              "name": "data_hora"
+            },
+            {
+              "name": "empresa_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1832f446-7788-4e4e-8c23-dbf8ba2e230c",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n1",
+              "name": "contato_cliente",
+              "value": "={{ ($json.contato_cliente || '').replace('@s.whatsapp.net', '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        -96
+      ],
+      "id": "c4d9a1b2-5c6f-4a6b-8d21-7e3f9c2a1b9e",
+      "name": "Normalizar Contato"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "agendamentos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "contato_cliente",
+              "condition": "eq",
+              "keyValue": "={{ $json.contato_cliente }}"
+            },
+            {
+              "keyName": "data_hora",
+              "condition": "eq",
+              "keyValue": "={{ $json.data_hora }}"
+            },
+            {
+              "keyName": "empresa_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.empresa_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "Cancelado"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "724c4821-8a4c-4609-a02a-1fabaa93f5d6",
+      "name": "Update a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "qrZ7Lx0Vz0dtVjl0",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ok = Array.isArray($json.data) && $json.data.length > 0;\nreturn [{ json: { cancel_ok: ok } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ],
+      "id": "e3f4a5b6-c7d8-49e0-8f1a-2b3c4d5e6f70",
+      "name": "AvaliarCancel"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.cancel_ok }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        0
+      ],
+      "id": "a1b2c3d4-e5f6-47a8-9b0c-1d2e3f4a5b6c",
+      "name": "CancelOk"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "cancel_ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "mensagem",
+              "value": "Agendamento cancelado com sucesso.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        -96
+      ],
+      "id": "f6e7d8c9-0a1b-42c3-9d8e-7f6a5b4c3d2e",
+      "name": "Resultado Cancelado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r3",
+              "name": "cancel_ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "r4",
+              "name": "mensagem",
+              "value": "Não encontrei agendamento para cancelar nesse horário.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1056,
+        96
+      ],
+      "id": "c9d8e7f6-5b4a-43c2-9a1b-0c9d8e7f6a5b",
+      "name": "Resultado Falha"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Contato": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "AvaliarCancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AvaliarCancel": {
+      "main": [
+        [
+          {
+            "node": "CancelOk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CancelOk": {
+      "main": [
+        [
+          {
+            "node": "Resultado Cancelado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado Falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ee9fefd0-3669-441e-a1be-46e7f78f0f22",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f0412fad1a6c8c3843eb6a404930fcbc22885095f7e8f73037797e8217b976b"
+  },
+  "id": "vvGVKY5ZcVAbTXok",
+  "tags": []
+}

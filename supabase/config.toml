@@ -1,0 +1,53 @@
+project_id = "rhmxylgoxqafgcbfbdaa"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_email_confirmations = false
+enable_sms_confirmations = false
+enable_email_change_confirmations = false
+enable_phone_change_confirmations = false
+
+[functions.send-auth-token]
+verify_jwt = false
+
+[functions.verify-auth-token]
+verify_jwt = false
+
+[functions.whatsapp-connect]
+verify_jwt = false
+
+[functions.whatsapp-status]
+verify_jwt = false
+
+[functions.whatsapp-inbound]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-media]
+verify_jwt = false
+
+[functions.ia-appointment-setter]
+verify_jwt = false
+
+[functions.n8n-send]
+verify_jwt = false
+
+[functions.whatsapp-scheduler]
+verify_jwt = false

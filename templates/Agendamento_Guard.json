@@ -1,0 +1,84 @@
+{
+  "name": "Agendamento Guard",
+  "nodes": [
+    {
+      "parameters": { "inputSource": "passthrough" },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "id": "trigger-guard",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v=$json.agenda_ativa; const s=String(v??'').toLowerCase(); const allowed=!(s==='false'||s==='0'||s==='no'); return [{ json:{ ...$json, allowed } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "id": "eval-guard",
+      "name": "Avaliar Flag"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "leftValue": "={{ $json.allowed }}", "rightValue": "true", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "id": "if-allowed",
+      "name": "Tem Agenda"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AGD-SAAS-PRO",
+          "mode": "id"
+        },
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [660, -80],
+      "id": "exec-sub",
+      "name": "Call 'Agendamento_SaaS_Profissional'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "mBlock", "name": "mensagem", "value": "A agenda desta empresa está desativada.", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 100],
+      "id": "set-disabled",
+      "name": "Agenda Desativada"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": { "main": [[{ "node": "Avaliar Flag", "type": "main", "index": 0 }]] },
+    "Avaliar Flag": { "main": [[{ "node": "Tem Agenda", "type": "main", "index": 0 }]] },
+    "Tem Agenda": {
+      "main": [
+        [{ "node": "Call 'Agendamento_SaaS_Profissional'", "type": "main", "index": 0 }],
+        [{ "node": "Agenda Desativada", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" },
+  "versionId": "agd-guard-v1",
+  "meta": { "templateCredsSetupCompleted": true },
+  "id": "WRP-AGD-GUARD",
+  "tags": []
+}

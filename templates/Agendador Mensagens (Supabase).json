@@ -1,0 +1,81 @@
+{
+  "name": "Agendador Mensagens (Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        320,
+        300
+      ],
+      "id": "b4d1a6f8-6a55-4d7d-8a9e-6aeb8a9d0e10",
+      "name": "Cron"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rhmxylgoxqafgcbfbdaa.supabase.co/functions/v1/whatsapp-scheduler",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "Bearer COLE_SEU_SCHEDULER_BEARER_TOKEN_AQUI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        300
+      ],
+      "id": "9e8f8f1d-8d7a-4e19-8c69-9d0b57e6c2b1",
+      "name": "Disparar Scheduler"
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Disparar Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1c0aa2e4-8b90-4d0c-9f69-77eab9c0b9d6",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AGENDADOR_SUPABASE",
+  "tags": []
+}
+

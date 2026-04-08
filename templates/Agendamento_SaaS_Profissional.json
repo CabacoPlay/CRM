@@ -1,0 +1,305 @@
+{
+  "name": "Agendamento SaaS Profissional",
+  "nodes": [
+    {
+      "parameters": { "inputSource": "passthrough" },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "id": "trigger",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($json.acao ?? $json.action ?? '').trim().toLowerCase();\nlet acao = raw;\nif (raw.includes('agendar')) acao = 'agendar';\nelse if (raw.includes('cancel')) acao = 'cancelar';\nelse if (raw.includes('disp') || raw.includes('dispon')) acao = 'disponibilidade';\nreturn [{ json: { ...$json, acao } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, 0],
+      "id": "normalizeAction",
+      "name": "Normalizar Ação"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  { "leftValue": "={{ $json.acao }}", "rightValue": "agendar", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AGENDAR"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  { "leftValue": "={{ $json.acao }}", "rightValue": "cancelar", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CANCELAR"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  { "leftValue": "={{ $json.acao }}", "rightValue": "disponibilidade", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DISPONIBILIDADE"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [200, 0],
+      "id": "router",
+      "name": "Roteador"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "agendamentos",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            { "keyName": "empresa_id", "condition": "eq", "keyValue": "={{ $json.empresa_id }}" },
+            { "keyName": "data_hora", "condition": "eq", "keyValue": "={{ $json.data_hora }}" },
+            { "keyName": "status", "condition": "eq", "keyValue": "Confirmado" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [420, -160],
+      "id": "checkConflict",
+      "name": "Checar Conflito",
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "qrZ7Lx0Vz0dtVjl0", "name": "Supabase account" } }
+    },
+    {
+      "parameters": { "jsCode": "const hasConflict = Array.isArray($json.data) && $json.data.length>0; return [{ json: { conflict: hasConflict } }];" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, -160],
+      "id": "evalConflict",
+      "name": "VerificaConflito"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "leftValue": "={{ $json.conflict }}", "rightValue": "true", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [860, -160],
+      "id": "ifConflict",
+      "name": "TemConflito"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "mInd", "name": "agendamento_ok", "value": false, "type": "boolean" },
+            { "id": "msgInd", "name": "mensagem", "value": "Horário indisponível para esta empresa. Posso sugerir outro horário?", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1080, -240],
+      "id": "setIndisponivel",
+      "name": "Resultado Indisponível"
+    },
+    {
+      "parameters": {
+        "tableId": "agendamentos",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "nome_cliente", "fieldValue": "={{ $json.nome_cliente }}" },
+            { "fieldId": "contato_cliente", "fieldValue": "={{ $json.contato_cliente }}" },
+            { "fieldId": "servico", "fieldValue": "={{ $json.servico }}" },
+            { "fieldId": "data_hora", "fieldValue": "={{ $json.data_hora }}" },
+            { "fieldId": "empresa_id", "fieldValue": "={{ $json.empresa_id }}" },
+            { "fieldId": "origem", "fieldValue": "IA" },
+            { "fieldId": "status", "fieldValue": "Confirmado" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1080, -80],
+      "id": "createRow",
+      "name": "Create a row",
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "qrZ7Lx0Vz0dtVjl0", "name": "Supabase account" } }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "mOk", "name": "agendamento_ok", "value": true, "type": "boolean" },
+            { "id": "msgOk", "name": "mensagem", "value": "={{ `Agendamento confirmado para ${$json.nome_cliente} às ${$json.data_hora} de ${$json.servico}.` }}", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1300, -80],
+      "id": "setSucesso",
+      "name": "Resultado Sucesso"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "nCont", "name": "contato_cliente", "value": "={{ ($json.contato_cliente || '').replace('@s.whatsapp.net','') }}", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 120],
+      "id": "normalizeCancel",
+      "name": "Normalizar Contato"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "agendamentos",
+        "filters": {
+          "conditions": [
+            { "keyName": "contato_cliente", "condition": "eq", "keyValue": "={{ $json.contato_cliente }}" },
+            { "keyName": "data_hora", "condition": "eq", "keyValue": "={{ $json.data_hora }}" },
+            { "keyName": "empresa_id", "condition": "eq", "keyValue": "={{ $json.empresa_id }}" }
+          ]
+        },
+        "fieldsUi": { "fieldValues": [ { "fieldId": "status", "fieldValue": "Cancelado" } ] }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [640, 120],
+      "id": "updateCancel",
+      "name": "Update Cancel",
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "qrZ7Lx0Vz0dtVjl0", "name": "Supabase account" } }
+    },
+    {
+      "parameters": { "jsCode": "const ok = Array.isArray($json.data)&&$json.data.length>0; return [{ json: { cancel_ok: ok } }];" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 120],
+      "id": "evalCancel",
+      "name": "AvaliarCancel"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            { "leftValue": "={{ $json.cancel_ok }}", "rightValue": "true", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1080, 120],
+      "id": "ifCancelOk",
+      "name": "CancelOk"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "cOk", "name": "cancel_ok", "value": true, "type": "boolean" },
+            { "id": "cMsgOk", "name": "mensagem", "value": "Agendamento cancelado com sucesso.", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1300, 40],
+      "id": "setCancelOk",
+      "name": "Resultado Cancelado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "cFail", "name": "cancel_ok", "value": false, "type": "boolean" },
+            { "id": "cMsgFail", "name": "mensagem", "value": "Não encontrei agendamento para cancelar nesse horário.", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1300, 200],
+      "id": "setCancelFail",
+      "name": "Resultado Falha"
+    },
+    {
+      "parameters": {
+        "jsCode": "const Luxon=global.Luxon||require('luxon'); const now=Luxon.DateTime.now().setZone('America/Sao_Paulo'); const days=[0,1,2]; const baseHours=[9,11,14,16]; const slots=[]; for(const d of days){const date=now.plus({days:d}).toISODate(); for(const h of baseHours){const hh=String(h).padStart(2,'0'); slots.push(`${date}T${hh}:00:00-03:00`);} } const msg=`Tenho estes horários: ${slots.map(s=>Luxon.DateTime.fromISO(s).toFormat('dd/MM HH:mm')).join(', ')}. Qual prefere?`; return [{ json: { mensagem: msg } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, -360],
+      "id": "genDisponibilidade",
+      "name": "Gerar Disponibilidade"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [[{ "node": "Normalizar Ação", "type": "main", "index": 0 }]]
+    },
+    "Normalizar Ação": {
+      "main": [[{ "node": "Roteador", "type": "main", "index": 0 }]]
+    },
+    "Roteador": {
+      "main": [
+        [{ "node": "Checar Conflito", "type": "main", "index": 0 }],
+        [{ "node": "Normalizar Contato", "type": "main", "index": 0 }],
+        [{ "node": "Gerar Disponibilidade", "type": "main", "index": 0 }]
+      ]
+    },
+    "Checar Conflito": { "main": [[{ "node": "VerificaConflito", "type": "main", "index": 0 }]] },
+    "VerificaConflito": { "main": [[{ "node": "TemConflito", "type": "main", "index": 0 }]] },
+    "TemConflito": {
+      "main": [
+        [{ "node": "Resultado Indisponível", "type": "main", "index": 0 }],
+        [{ "node": "Create a row", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create a row": { "main": [[{ "node": "Resultado Sucesso", "type": "main", "index": 0 }]] },
+    "Normalizar Contato": { "main": [[{ "node": "Update Cancel", "type": "main", "index": 0 }]] },
+    "Update Cancel": { "main": [[{ "node": "AvaliarCancel", "type": "main", "index": 0 }]] },
+    "AvaliarCancel": { "main": [[{ "node": "CancelOk", "type": "main", "index": 0 }]] },
+    "CancelOk": {
+      "main": [
+        [{ "node": "Resultado Cancelado", "type": "main", "index": 0 }],
+        [{ "node": "Resultado Falha", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" },
+  "versionId": "agd-saas-prof-v1",
+  "meta": { "templateCredsSetupCompleted": true },
+  "id": "AGD-SAAS-PRO",
+  "tags": []
+}

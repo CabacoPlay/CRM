@@ -1,0 +1,686 @@
+{
+  "name": "Criar Agendamento",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "nome_cliente"
+            },
+            {
+              "name": "contato_cliente"
+            },
+            {
+              "name": "servico"
+            },
+            {
+              "name": "data_hora"
+            },
+            {
+              "name": "empresa_id"
+            }
+            ,
+            {
+              "name": "agenda_ativa"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        752
+      ],
+      "id": "d43d0c05-199e-4729-a849-8bcbab054dc0",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $json.agenda_ativa;\nconst s = String(v ?? '').trim().toLowerCase();\nconst allowed = !(s === 'false' || s === '0' || s === 'no');\nreturn [{ json: { ...$json, allowed } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        752
+      ],
+      "id": "b6c3d9b5-0a17-4ff4-8f87-7b8a6f17b1d3",
+      "name": "Avaliar Agenda"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        752
+      ],
+      "id": "d38b2c70-4e22-4c63-9a7e-96b2b18c1db5",
+      "name": "Tem Agenda"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m0",
+              "name": "mensagem",
+              "value": "A agenda está desativada no momento. Me informe outro dia e horário, por favor.",
+              "type": "string"
+            },
+            {
+              "id": "m1",
+              "name": "agendamento_ok",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        912
+      ],
+      "id": "4a8f4de3-2772-4c1c-8c80-0a3d62a3cb2f",
+      "name": "Agenda Desativada"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "today",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toISODate() }}",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "tzOffset",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toFormat('ZZ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        752
+      ],
+      "id": "0a14f0ad-f6bf-4ddb-a383-14d3be66a1f3",
+      "name": "Preparar Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputRaw = String($json.data_hora || '').trim();\nconst today = String($json.today || '').trim();\nconst tz = String($json.tzOffset || '-03:00').trim();\n\nfunction pad(n) { return n.toString().padStart(2, '0'); }\nfunction addDaysToIsoDate(isoDate, days) {\n  const parts = String(isoDate || '').split('-').map((p) => Number(p));\n  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return String(isoDate || '');\n  const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));\n  dt.setUTCDate(dt.getUTCDate() + Number(days || 0));\n  return dt.toISOString().slice(0, 10);\n}\n\nconst year = today ? today.split('-')[0] : String($now.setZone('America/Sao_Paulo').year);\nlet input = inputRaw.replace(/\\s+/g, ' ').trim();\n\nlet normalized = inputRaw;\n\nconst isoWithZ = input.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2})?(?:\\.\\d+)?Z$/);\nconst isoWithoutTz = input.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2})?(?:\\.\\d+)?$/);\n\nconst simpleHour = input.match(/^(\\d{1,2})h$/i);\nconst hourMin = input.match(/^(\\d{1,2})h(\\d{2})$/i);\nconst colonHM = input.match(/^(\\d{1,2})(:(\\d{2}))$/);\n\nconst relDayTime = input\n  .replace(/^dia\\s+/i, '')\n  .replace(/\\s*(às|as|a)\\s*/i, ' ')\n  .match(/^(hoje|amanha|amanhã)\\s+(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm)?$/i);\n\nconst brDateTime = input\n  .replace(/^dia\\s+/i, '')\n  .replace(/\\s*(às|as|a)\\s*/i, ' ')\n  .match(/^(\\d{1,2})[\\/\\-](\\d{1,2})(?:[\\/\\-](\\d{2,4}))?\\s+(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm)?$/i);\n\nif (simpleHour && today) {\n  const h = pad(Number(simpleHour[1]));\n  normalized = `${today}T${h}:00:00${tz}`;\n} else if (hourMin && today) {\n  const h = pad(Number(hourMin[1]));\n  const m = pad(Number(hourMin[2]));\n  normalized = `${today}T${h}:${m}:00${tz}`;\n} else if (colonHM && today) {\n  const h = pad(Number(colonHM[1]));\n  const m = pad(Number(colonHM[3]));\n  normalized = `${today}T${h}:${m}:00${tz}`;\n} else if (relDayTime && today) {\n  const dayWord = String(relDayTime[1] || '').toLowerCase();\n  const baseDate = dayWord === 'amanha' || dayWord === 'amanhã' ? addDaysToIsoDate(today, 1) : today;\n\n  let h = Number(relDayTime[2]);\n  const min = pad(Number(relDayTime[3] || '0'));\n  const ampm = String(relDayTime[4] || '').toLowerCase();\n  if (ampm === 'pm' && h < 12) h += 12;\n  if (ampm === 'am' && h === 12) h = 0;\n\n  normalized = `${baseDate}T${pad(h)}:${min}:00${tz}`;\n} else if (brDateTime) {\n  const dd = pad(Number(brDateTime[1]));\n  const mm = pad(Number(brDateTime[2]));\n  const yyyyRaw = brDateTime[3];\n  const yyyy = yyyyRaw ? String(yyyyRaw).length === 2 ? `20${yyyyRaw}` : String(yyyyRaw) : year;\n\n  let h = Number(brDateTime[4]);\n  const min = pad(Number(brDateTime[5] || '0'));\n  const ampm = String(brDateTime[6] || '').toLowerCase();\n  if (ampm === 'pm' && h < 12) h += 12;\n  if (ampm === 'am' && h === 12) h = 0;\n\n  normalized = `${yyyy}-${mm}-${dd}T${pad(h)}:${min}:00${tz}`;\n} else if (isoWithZ) {\n  normalized = input.replace(/Z$/, tz);\n} else if (isoWithoutTz) {\n  normalized = `${input}${tz}`;\n} else {\n  normalized = inputRaw;\n}\n\nreturn [{ json: { ...$json, normalized_data_hora: normalized } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        752
+      ],
+      "id": "7907aded-0176-436d-9a0a-87f3d677b093",
+      "name": "Normalizar DataHora"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "agendamentos",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "empresa_id",
+              "condition": "eq",
+              "keyValue": "={{ $node['When Executed by Another Workflow'].json.empresa_id }}"
+            },
+            {
+              "keyName": "data_hora",
+              "condition": "eq",
+              "keyValue": "={{ $node['Normalizar DataHora'].json.normalized_data_hora || $node['When Executed by Another Workflow'].json.data_hora }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "neq",
+              "keyValue": "Cancelado"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        64,
+        752
+      ],
+      "id": "c339db83-80e5-4b00-9dfd-242008d5d83a",
+      "name": "Checar Conflito",
+      "alwaysOutputData": true,
+      "continueOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "qrZ7Lx0Vz0dtVjl0",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.data;\nconst hasConflict = Array.isArray(data) && data.length > 0;\nreturn [{ json: { conflict: hasConflict } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        752
+      ],
+      "id": "50691e4b-e523-468a-bb5c-239798ad0f22",
+      "name": "VerificaConflito"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.conflict }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        752
+      ],
+      "id": "fd6a5ca3-af05-47d1-b319-9869ecc6aefa",
+      "name": "TemConflito"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "erro",
+              "value": "Horário indisponível para esta empresa.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        688,
+        656
+      ],
+      "id": "79b7b178-0ce9-4209-8546-8942d5e54af3",
+      "name": "Conflito"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "agendamentos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "nome_cliente",
+              "fieldValue": "={{ $node['When Executed by Another Workflow'].json.nome_cliente }}"
+            },
+            {
+              "fieldId": "contato_cliente",
+              "fieldValue": "={{ $node['When Executed by Another Workflow'].json.contato_cliente }}"
+            },
+            {
+              "fieldId": "servico",
+              "fieldValue": "={{ $node['When Executed by Another Workflow'].json.servico }}"
+            },
+            {
+              "fieldId": "data_hora",
+              "fieldValue": "={{ $node['Normalizar DataHora'].json.normalized_data_hora || $node['When Executed by Another Workflow'].json.data_hora }}"
+            },
+            {
+              "fieldId": "empresa_id",
+              "fieldValue": "={{ $node['When Executed by Another Workflow'].json.empresa_id }}"
+            },
+            {
+              "fieldId": "origem",
+              "fieldValue": "IA"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "Confirmado"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        688,
+        848
+      ],
+      "id": "88542800-f936-4a1d-a4cb-a8ce814bfeea",
+      "name": "Create a row",
+      "alwaysOutputData": true,
+      "continueOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "qrZ7Lx0Vz0dtVjl0",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.data;\nconst hasData = Array.isArray(data) ? data.length > 0 : Boolean(data);\n\nconst err = $json.error ?? null;\nconst errObj = err && typeof err === 'object' ? err : null;\nconst errorCode = String((errObj && (errObj.code ?? errObj.statusCode ?? errObj.errorCode)) ?? '').trim();\nconst errorMessage = String((errObj && (errObj.message ?? errObj.details ?? errObj.hint)) ?? (err ? JSON.stringify(err) : '')).trim();\n\nconst hasError = Boolean(err);\nconst conflictByUnique = errorCode === '23505' || /duplicate key|unique/i.test(errorMessage);\n\nconst statusCandidate = $json.statusCode ?? $json.status ?? $json.httpStatus ?? $json?.meta?.statusCode ?? $json?.response?.statusCode;\nconst status = Number(statusCandidate);\nconst looksLikeHttpSuccess = Number.isFinite(status) && status >= 200 && status < 300;\n\nconst insertOk = !hasError && (hasData || looksLikeHttpSuccess || statusCandidate == null);\n\nreturn [{\n  json: {\n    insert_ok: insertOk,\n    insert_error: err,\n    insert_error_code: errorCode || null,\n    insert_error_message: errorMessage || null,\n    conflict_by_unique: conflictByUnique,\n    insert_status_code: Number.isFinite(status) ? status : null,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        848
+      ],
+      "id": "eafab345-e0ff-48fc-b5cb-cf95fb422443",
+      "name": "AvaliarInsert"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe1",
+              "name": "agendamento_ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fe2",
+              "name": "mensagem",
+              "value": "Não consegui salvar o agendamento no sistema agora. Pode tentar novamente em instantes?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        1024
+      ],
+      "id": "0b223f91-9b01-4bdf-9b2a-6c7a8a49c979",
+      "name": "Falha Insert"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "agendamento_ok",
+              "value": "={{ !$json.conflict_by_unique }}",
+              "type": "boolean"
+            },
+            {
+              "id": "s2",
+              "name": "data_hora",
+              "value": "={{ $node['Normalizar DataHora'].json.normalized_data_hora || $node['When Executed by Another Workflow'].json.data_hora }}",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "servico",
+              "value": "={{ $node['When Executed by Another Workflow'].json.servico }}",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "nome_cliente",
+              "value": "={{ $node['When Executed by Another Workflow'].json.nome_cliente }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        592
+      ],
+      "id": "41a136c7-d84a-475f-b637-ecf383f7c208",
+      "name": "Sucesso"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rs1",
+              "name": "agendamento_ok",
+              "value": "={{ $json.agendamento_ok }}",
+              "type": "boolean"
+            },
+            {
+              "id": "rs2",
+              "name": "mensagem",
+              "value": "={{ $json.agendamento_ok ? `Agendamento confirmado para ${$json.nome_cliente} às ${$json.data_hora} de ${$json.servico}.` : 'Já existe agendamento confirmado nesse horário. Posso sugerir outro horário?' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        592
+      ],
+      "id": "9c7f2077-070d-433a-a3b6-5e220702a8ee",
+      "name": "Resultado Sucesso"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rc1",
+              "name": "agendamento_ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "rc2",
+              "name": "mensagem",
+              "value": "Já existe agendamento confirmado nesse horário. Posso sugerir outro horário?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        848
+      ],
+      "id": "35f17415-887a-4123-ba7a-eeaf10451ddb",
+      "name": "Resultado Conflito"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.insert_ok || $json.conflict_by_unique }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        1024
+      ],
+      "id": "dbbaf32f-8b1f-4ca0-bbec-95d1391babc1",
+      "name": "InsertOk"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "nome_cliente": "Roberto Teste",
+          "contato_cliente": "11999999999",
+          "servico": "Corte de Cabelo",
+          "data_hora": "2026-02-26T16:00:00-03:00",
+          "empresa_id": "27bb4ba5-0bcc-4a00-a1f2-88543bee6ded"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Avaliar Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliar Agenda": {
+      "main": [
+        [
+          {
+            "node": "Tem Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Agenda": {
+      "main": [
+        [
+          {
+            "node": "Preparar Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agenda Desativada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Data": {
+      "main": [
+        [
+          {
+            "node": "Normalizar DataHora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar DataHora": {
+      "main": [
+        [
+          {
+            "node": "Checar Conflito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar Conflito": {
+      "main": [
+        [
+          {
+            "node": "VerificaConflito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VerificaConflito": {
+      "main": [
+        [
+          {
+            "node": "TemConflito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TemConflito": {
+      "main": [
+        [
+          {
+            "node": "Conflito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "AvaliarInsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AvaliarInsert": {
+      "main": [
+        [
+          {
+            "node": "InsertOk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertOk": {
+      "main": [
+        [
+          {
+            "node": "Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falha Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Resultado Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conflito": {
+      "main": [
+        [
+          {
+            "node": "Resultado Conflito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f0566ffa-507d-42a5-90b9-7fb8294a481a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f0412fad1a6c8c3843eb6a404930fcbc22885095f7e8f73037797e8217b976b"
+  },
+  "id": "4G8C3WI99KTIAWzC",
+  "tags": []
+}

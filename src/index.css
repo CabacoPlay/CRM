@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Gestor de IA para WhatsApp - Design System 
+Modern, minimalist SaaS interface with whitelabel support
+*/
+
+@layer base {
+  :root {
+    /* Base system colors */
+    --background: 0 0% 100%;
+    --foreground: 225 39% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 39% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 39% 10%;
+
+    /* Whitelabel primary theme - modern blue/purple gradient system */
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 258 100% 80%;
+    --primary-dark: 258 90% 45%;
+
+    /* Whitelabel secondary theme */
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 225 39% 10%;
+    --secondary-accent: 258 30% 96%;
+
+    /* Status colors for badges and states */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 0% 100%;
+
+    /* Neutral system */
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 225 16% 47%;
+    --muted-darker: 225 16% 42%;
+
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 225 39% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 258 90% 66%;
+
+    --radius: 1rem;
+
+    /* Sidebar system */
+    --sidebar-background: 0 0% 99%;
+    --sidebar-foreground: 225 39% 10%;
+    --sidebar-primary: 258 90% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14.3% 95.9%;
+    --sidebar-accent-foreground: 225 39% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 258 90% 66%;
+
+    /* Gradients for modern effects */
+    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 100% 80%));
+    --gradient-hero: linear-gradient(135deg, hsl(258 90% 66%) 0%, hsl(220 100% 70%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 14.3% 98%) 100%);
+
+    /* Shadows for depth */
+    --shadow-sm: 0 1px 2px 0 hsl(225 39% 10% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(225 39% 10% / 0.1), 0 2px 4px -1px hsl(225 39% 10% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(225 39% 10% / 0.1), 0 4px 6px -2px hsl(225 39% 10% / 0.05);
+    --shadow-glow: 0 0 40px hsl(258 90% 66% / 0.3);
+
+    /* Animation system */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Whitelabel customizable variables */
+    --brand-name: "Gestor IA WhatsApp";
+    --brand-logo: "";
+  }
+
+  .dark {
+    --background: 225 39% 4%;
+    --foreground: 210 40% 98%;
+
+    --card: 225 39% 6%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 225 39% 6%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 258 100% 80%;
+    --primary-dark: 258 90% 45%;
+
+    --secondary: 225 39% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --secondary-accent: 258 30% 8%;
+
+    --success: 142 76% 36%;
+    --warning: 38 92% 50%;
+    --danger: 0 84% 60%;
+
+    --muted: 225 39% 12%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --muted-darker: 215 20.2% 55%;
+
+    --accent: 225 39% 12%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 225 39% 15%;
+    --input: 225 39% 15%;
+    --ring: 258 90% 66%;
+
+    --sidebar-background: 225 39% 5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 258 90% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 225 39% 10%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 225 39% 15%;
+    --sidebar-ring: 258 90% 66%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 100% 80%));
+    --gradient-hero: linear-gradient(135deg, hsl(258 90% 66%) 0%, hsl(220 100% 70%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(225 39% 4%) 0%, hsl(225 39% 6%) 100%);
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -1px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -2px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 40px hsl(258 90% 66% / 0.4);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
