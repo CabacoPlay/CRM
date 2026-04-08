@@ -409,6 +409,21 @@ export default function OrcamentosPage() {
     return <Badge className="bg-warning/15 text-warning border-warning/20">Pendente</Badge>;
   };
 
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null);
+  const updateStatus = async (id: string, status: Orcamento['status']) => {
+    setSavingStatusId(id);
+    try {
+      const { error } = await supabase.from('orcamentos').update({ status }).eq('id', id);
+      if (error) throw error;
+      setOrcamentos(prev => prev.map(o => (o.id === id ? { ...o, status } : o)));
+      toast({ title: 'Atualizado', description: 'Status do orçamento atualizado.' });
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o status.', variant: 'destructive' });
+    } finally {
+      setSavingStatusId(null);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -451,6 +466,20 @@ export default function OrcamentosPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <Select
+                        value={o.status}
+                        onValueChange={(v) => updateStatus(o.id, v as Orcamento['status'])}
+                        disabled={savingStatusId === o.id}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pendente">Pendente</SelectItem>
+                          <SelectItem value="Aprovado">Aprovado</SelectItem>
+                          <SelectItem value="Cancelado">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button
                         variant="outline"
                         onClick={() => generatePdf(o.id)}
