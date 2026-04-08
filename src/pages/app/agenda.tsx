@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, 
   Clock, 
@@ -56,16 +57,142 @@ export default function AgendaPage() {
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [monthSummary, setMonthSummary] = useState<Record<string, { total: number; confirmed: number }>>({});
-  
-  const [formData, setFormData] = useState({
+
+  type NovoAgendamentoForm = {
+    nome_cliente: string;
+    contato_cliente: string;
+    servico: string;
+    hora: string;
+    status: 'Confirmado' | 'Pendente';
+  };
+  const [formData, setFormData] = useState<NovoAgendamentoForm>({
     nome_cliente: '',
     contato_cliente: '',
     servico: '',
     hora: '09:00',
-    status: 'Confirmado' as const,
+    status: 'Confirmado',
   });
+  // Busca de contato integrada ao campo "Nome do Cliente"
+  const [contactResults, setContactResults] = useState<Array<{ id: string; nome: string; contato: string }>>([]);
+  const [contactSearching, setContactSearching] = useState(false);
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+
+  type AgendaSettings = {
+    empresa_id: string;
+    timezone: string;
+    schedule: Record<string, { open: string; close: string }>;
+    slot_interval_minutes: number;
+    min_advance_minutes: number;
+    max_advance_days: number;
+    reminder_hours: number;
+    confirm_template: string | null;
+  };
+  const [settings, setSettings] = useState<AgendaSettings | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  const defaultSchedule: AgendaSettings['schedule'] = {
+    mon: { open: '08:00', close: '18:00' },
+    tue: { open: '08:00', close: '18:00' },
+    wed: { open: '08:00', close: '18:00' },
+    thu: { open: '08:00', close: '18:00' },
+    fri: { open: '08:00', close: '18:00' },
+    sat: { open: '09:00', close: '13:00' },
+    sun: { open: '00:00', close: '00:00' },
+  };
+  const dayLabels: Record<keyof AgendaSettings['schedule'], string> = {
+    mon: 'SEG',
+    tue: 'TER',
+    wed: 'QUA',
+    thu: 'QUI',
+    fri: 'SEX',
+    sat: 'SÁB',
+    sun: 'DOM',
+  };
+  const dayOrder: Array<keyof AgendaSettings['schedule']> = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user?.empresa_id) return;
+      const { data } = await supabase
+        .from('agenda_settings')
+        .select('empresa_id,timezone,schedule,slot_interval_minutes,min_advance_minutes,max_advance_days,reminder_hours,confirm_template')
+        .eq('empresa_id', user.empresa_id)
+        .maybeSingle();
+      if (data) {
+        const s = data as unknown as AgendaSettings;
+        if (!s.schedule || typeof s.schedule !== 'object') s.schedule = defaultSchedule;
+        setSettings(s);
+      } else {
+        setSettings({
+          empresa_id: user.empresa_id,
+          timezone: 'America/Sao_Paulo',
+          schedule: defaultSchedule,
+          slot_interval_minutes: 30,
+          min_advance_minutes: 60,
+          max_advance_days: 60,
+          reminder_hours: 24,
+          confirm_template: null,
+        });
+      }
+    };
+    loadSettings();
+  }, [user?.empresa_id]);
+
+  const saveSettings = async () => {
+    if (!user?.empresa_id || !settings) return;
+    setSettingsSaving(true);
+    try {
+      const payload = {
+        ...settings,
+        empresa_id: user.empresa_id,
+      };
+      await supabase.from('agenda_settings').upsert(payload, { onConflict: 'empresa_id' });
+      toast({ title: 'Salvo', description: 'Configurações da agenda atualizadas.' });
+      setIsSettingsOpen(false);
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Não foi possível salvar as configurações.', variant: 'destructive' });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const q = (formData.nome_cliente || '').trim();
+    if (!user?.empresa_id || q.length < 2) {
+      setContactResults([]);
+      return;
+    }
+    let disposed = false;
+    const run = async () => {
+      setContactSearching(true);
+      try {
+        const onlyDigits = q.replace(/\D/g, '');
+        let sel = supabase
+          .from('contatos')
+          .select('id,nome,contato')
+          .eq('empresa_id', user.empresa_id)
+          .order('updated_at', { ascending: false })
+          .limit(20);
+        if (onlyDigits) {
+          sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${onlyDigits}%`);
+        } else {
+          sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${q}%`);
+        }
+        const { data } = await sel;
+        if (!disposed) setContactResults((data || []) as any);
+      } finally {
+        if (!disposed) setContactSearching(false);
+      }
+    };
+    const t = setTimeout(run, 250);
+    return () => {
+      disposed = true;
+      clearTimeout(t);
+    };
+  }, [formData.nome_cliente, user?.empresa_id]);
 
   useEffect(() => {
     if (user?.empresa_id) {
@@ -337,7 +464,7 @@ export default function AgendaPage() {
             <p className="text-muted-foreground">Gerencie seus compromissos e deixe a IA agendar por você.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline"><Settings className="h-4 w-4 mr-2" /> Configurações</Button>
+            <Button variant="outline" onClick={() => setIsSettingsOpen(true)}><Settings className="h-4 w-4 mr-2" /> Configurações</Button>
             <Button onClick={() => setIsModalOpen(true)}><Plus className="h-4 w-4 mr-2" /> Novo Agendamento</Button>
           </div>
         </div>
@@ -534,8 +661,34 @@ export default function AgendaPage() {
                 id="nome" 
                 placeholder="Ex: João da Silva" 
                 value={formData.nome_cliente}
-                onChange={(e) => setFormData({...formData, nome_cliente: e.target.value})}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData({ ...formData, nome_cliente: v });
+                  setShowContactDropdown(v.trim().length >= 2);
+                }}
+                onFocus={() => setShowContactDropdown((formData.nome_cliente || '').trim().length >= 2)}
               />
+              {showContactDropdown && contactResults.length > 0 && (
+                <div className="mt-2 border rounded-md max-h-48 overflow-auto bg-background">
+                  {contactResults.map(c => {
+                    const phone = String(c.contato || '').replace(/\D/g, '');
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent"
+                        onClick={() => {
+                          setFormData({ ...formData, nome_cliente: c.nome || '', contato_cliente: phone });
+                          setShowContactDropdown(false);
+                        }}
+                      >
+                        <div className="text-sm font-medium">{c.nome || 'Sem nome'}</div>
+                        <div className="text-xs text-muted-foreground">{phone}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="contato" className="font-bold">WhatsApp / Telefone</Label>
@@ -569,7 +722,7 @@ export default function AgendaPage() {
                 <Label htmlFor="status" className="font-bold">Status</Label>
                 <Select 
                   value={formData.status} 
-                  onValueChange={(v) => setFormData({ ...formData, status: v as 'Confirmado' | 'Pendente' })}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as NovoAgendamentoForm['status'] })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -590,6 +743,102 @@ export default function AgendaPage() {
               Salvar Agendamento
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">Configurações da Agenda</DialogTitle>
+            <DialogDescription>Defina horários, intervalos e mensagens padrão.</DialogDescription>
+          </DialogHeader>
+          {settings && (
+            <div className="grid gap-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="font-bold">Fuso horário</Label>
+                  <Input
+                    value={settings.timezone}
+                    onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                    placeholder="America/Sao_Paulo"
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Intervalo (min)</Label>
+                  <Input
+                    type="number"
+                    value={String(settings.slot_interval_minutes)}
+                    onChange={(e) => setSettings({ ...settings, slot_interval_minutes: Math.max(5, Number(e.target.value) || 30) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {dayOrder.map((day) => {
+                  const v = settings.schedule[day];
+                  return (
+                  <div key={day} className="border rounded-md p-2">
+                    <div className="text-xs font-bold uppercase mb-1">{dayLabels[day]}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="time"
+                        value={v.open}
+                        onChange={(e) => setSettings({ ...settings, schedule: { ...settings.schedule, [day]: { ...v, open: e.target.value } } })}
+                      />
+                      <Input
+                        type="time"
+                        value={v.close}
+                        onChange={(e) => setSettings({ ...settings, schedule: { ...settings.schedule, [day]: { ...v, close: e.target.value } } })}
+                      />
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="font-bold">Antecedência mínima (min)</Label>
+                  <Input
+                    type="number"
+                    value={String(settings.min_advance_minutes)}
+                    onChange={(e) => setSettings({ ...settings, min_advance_minutes: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Antecedência máxima (dias)</Label>
+                  <Input
+                    type="number"
+                    value={String(settings.max_advance_days)}
+                    onChange={(e) => setSettings({ ...settings, max_advance_days: Math.max(1, Number(e.target.value) || 60) })}
+                  />
+                </div>
+                <div>
+                  <Label className="font-bold">Lembrete (horas antes)</Label>
+                  <Input
+                    type="number"
+                    value={String(settings.reminder_hours)}
+                    onChange={(e) => setSettings({ ...settings, reminder_hours: Math.max(1, Number(e.target.value) || 24) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="font-bold">Mensagem de confirmação (opcional)</Label>
+                <Textarea
+                  value={settings.confirm_template || ''}
+                  onChange={(e) => setSettings({ ...settings, confirm_template: e.target.value || null })}
+                  placeholder="Olá {nome}, seu horário {servico} está confirmado para {data_hora}."
+                />
+                <div className="text-xs text-muted-foreground">Variáveis suportadas: {'{nome}'}, {'{servico}'}, {'{data_hora}'}</div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>Cancelar</Button>
+                <Button onClick={saveSettings} disabled={settingsSaving}>{settingsSaving ? 'Salvando...' : 'Salvar'}</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </AppLayout>

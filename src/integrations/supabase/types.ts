@@ -41,6 +41,53 @@ export type Database = {
         }
         Relationships: []
       }
+      agenda_settings: {
+        Row: {
+          empresa_id: string
+          timezone: string
+          schedule: Json
+          slot_interval_minutes: number
+          min_advance_minutes: number
+          max_advance_days: number
+          reminder_hours: number
+          confirm_template: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          timezone?: string
+          schedule?: Json
+          slot_interval_minutes?: number
+          min_advance_minutes?: number
+          max_advance_days?: number
+          reminder_hours?: number
+          confirm_template?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          timezone?: string
+          schedule?: Json
+          slot_interval_minutes?: number
+          min_advance_minutes?: number
+          max_advance_days?: number
+          reminder_hours?: number
+          confirm_template?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_settings_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agendamentos: {
         Row: {
           contato_cliente: string | null
