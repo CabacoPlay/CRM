@@ -456,13 +456,17 @@ export default function OrcamentosPage() {
       page.drawRectangle({ x: 0, y: headerBottom, width: page.getWidth(), height: headerHeight, color: brandPrimary });
 
       if (headerLogo) {
-        const bytes = await fetchAsUint8(headerLogo);
-        const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-        const img = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-        const maxW = 96;
-        const maxH = 52;
-        const scale = Math.min(maxW / img.width, maxH / img.height, 1);
-        page.drawImage(img, { x: margin, y: headerBottom + (headerHeight - img.height * scale) / 2, width: img.width * scale, height: img.height * scale });
+        try {
+          const bytes = await fetchAsUint8(headerLogo);
+          const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+          const img = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+          const maxW = 96;
+          const maxH = 52;
+          const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+          page.drawImage(img, { x: margin, y: headerBottom + (headerHeight - img.height * scale) / 2, width: img.width * scale, height: img.height * scale });
+        } catch (e) {
+          console.error(e);
+        }
       }
 
       const headerLines: string[] = [];
@@ -581,14 +585,6 @@ export default function OrcamentosPage() {
       const blob = new Blob([Uint8Array.from(bytes)], { type: 'application/pdf' });
       const fileName = `orcamento-${orc.id}.pdf`;
 
-      const path = `${empresaId}/pdf/${orc.id}.pdf`;
-      const { error: upErr } = await supabase.storage.from('orcamentos').upload(path, blob, { upsert: true, contentType: 'application/pdf' });
-      if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('orcamentos').getPublicUrl(path);
-
-      await supabase.from('orcamentos').update({ pdf_url: pub.publicUrl }).eq('id', orc.id);
-      setOrcamentos(prev => prev.map(o => (o.id === orc.id ? { ...o, pdf_url: pub.publicUrl } : o)));
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -596,10 +592,23 @@ export default function OrcamentosPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      toast({ title: 'PDF gerado', description: 'O arquivo foi baixado e salvo no sistema.' });
+      try {
+        const path = `${empresaId}/pdf/${orc.id}.pdf`;
+        const { error: upErr } = await supabase.storage.from('orcamentos').upload(path, blob, { upsert: true, contentType: 'application/pdf' });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from('orcamentos').getPublicUrl(path);
+        await supabase.from('orcamentos').update({ pdf_url: pub.publicUrl }).eq('id', orc.id);
+        setOrcamentos(prev => prev.map(o => (o.id === orc.id ? { ...o, pdf_url: pub.publicUrl } : o)));
+        toast({ title: 'PDF gerado', description: 'O arquivo foi baixado e salvo no sistema.' });
+      } catch (e) {
+        console.error(e);
+        const msg = String((e as any)?.message || e || '').trim();
+        toast({ title: 'PDF gerado', description: msg ? `Baixado, mas não foi possível salvar no sistema: ${msg}` : 'Baixado, mas não foi possível salvar no sistema.' });
+      }
     } catch (e) {
       console.error(e);
-      toast({ title: 'Erro', description: 'Não foi possível gerar o PDF.', variant: 'destructive' });
+      const msg = String((e as any)?.message || e || '').trim();
+      toast({ title: 'Erro', description: msg || 'Não foi possível gerar o PDF.', variant: 'destructive' });
     } finally {
       setGenerating(null);
     }
