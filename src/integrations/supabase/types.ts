@@ -145,6 +145,56 @@ export type Database = {
           },
         ]
       }
+      orcamento_settings: {
+        Row: {
+          created_at: string
+          email: string | null
+          empresa_id: string
+          instagram: string | null
+          logo_url: string | null
+          pix_banco: string | null
+          pix_chave: string | null
+          pix_nome: string | null
+          updated_at: string
+          validade_dias: number
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          empresa_id: string
+          instagram?: string | null
+          logo_url?: string | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          pix_nome?: string | null
+          updated_at?: string
+          validade_dias?: number
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          empresa_id?: string
+          instagram?: string | null
+          logo_url?: string | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          pix_nome?: string | null
+          updated_at?: string
+          validade_dias?: number
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_settings_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamento_itens: {
         Row: {
           catalog_item_id: string | null
