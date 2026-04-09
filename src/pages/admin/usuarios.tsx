@@ -23,6 +23,7 @@ interface Usuario {
   email: string;
   empresa_id?: string;
   papel: 'admin' | 'cliente';
+  avatar_url?: string | null;
   created_at?: string;
 }
 
@@ -93,7 +94,7 @@ export default function AdminUsuarios() {
       // Load usuarios
       const { data: usuariosData, error: usuariosError } = await supabase
         .from('usuarios')
-        .select('*')
+        .select('id,nome,telefone,email,empresa_id,papel,created_at,avatar_url')
         .order('created_at', { ascending: false });
 
       if (usuariosError) throw usuariosError;
@@ -106,6 +107,7 @@ export default function AdminUsuarios() {
         empresa_id: usuario.empresa_id,
         papel: usuario.papel,
         created_at: usuario.created_at,
+        avatar_url: usuario.avatar_url,
       }));
       
       setUsuarios(mappedUsuarios);
@@ -478,8 +480,12 @@ export default function AdminUsuarios() {
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-                              {letter}
+                            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 overflow-hidden">
+                              {u.avatar_url ? (
+                                <img src={u.avatar_url} alt="" className="h-full w-full object-cover bg-background" />
+                              ) : (
+                                letter
+                              )}
                             </div>
                             <div className="min-w-0">
                               <CardTitle className="text-base truncate">{u.nome}</CardTitle>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload } from 'lucide-react';
 import { ConexoesContent } from '@/pages/app/conexoes';
 
 const sb: any = supabase;
@@ -82,7 +82,7 @@ const menuTreePlaceholder = `[
 ]`;
 
 export default function ConfiguracoesPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { toast } = useToast();
 
   const empresaId = user?.empresa_id || null;
@@ -96,6 +96,9 @@ export default function ConfiguracoesPage() {
   const [newEtiquetaCor, setNewEtiquetaCor] = useState('#3B82F6');
   const [menuTreeDraft, setMenuTreeDraft] = useState('');
   const [menuTreeError, setMenuTreeError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const timezones = useMemo(() => ['America/Sao_Paulo', 'America/Manaus', 'America/Fortaleza', 'UTC'], []);
 
@@ -151,6 +154,65 @@ export default function ConfiguracoesPage() {
 
     load();
   }, [empresaId]);
+
+  useEffect(() => {
+    setAvatarPreview((user as any)?.avatar_url || null);
+  }, [user?.id, (user as any)?.avatar_url]);
+
+  const handleAvatarPick = async (file: File | null) => {
+    if (!user?.id) return;
+    if (!file) return;
+    const allowed = ['image/png', 'image/jpeg'];
+    if (!allowed.includes(file.type)) {
+      toast({ title: 'Arquivo inválido', description: 'Envie PNG ou JPG.', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast({ title: 'Arquivo grande', description: 'A foto deve ter no máximo 3MB.', variant: 'destructive' });
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const reader = new FileReader();
+      const preview = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.readAsDataURL(file);
+      });
+      setAvatarPreview(preview);
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${user.id}/avatar-${Date.now()}-${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('user-avatars').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data } = supabase.storage.from('user-avatars').getPublicUrl(path);
+      const url = data.publicUrl;
+      const { error: uerr } = await supabase.from('usuarios').update({ avatar_url: url }).eq('id', user.id);
+      if (uerr) throw uerr;
+      updateUser({ avatar_url: url } as any);
+      toast({ title: 'Atualizado', description: 'Foto do usuário atualizada.' });
+    } catch {
+      setAvatarPreview((user as any)?.avatar_url || null);
+      toast({ title: 'Erro', description: 'Não foi possível atualizar a foto.', variant: 'destructive' });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!user?.id) return;
+    setAvatarUploading(true);
+    try {
+      const { error } = await supabase.from('usuarios').update({ avatar_url: null }).eq('id', user.id);
+      if (error) throw error;
+      updateUser({ avatar_url: null as any } as any);
+      setAvatarPreview(null);
+      toast({ title: 'Removido', description: 'Foto do usuário removida.' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível remover a foto.', variant: 'destructive' });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!settings) return;
@@ -248,8 +310,48 @@ export default function ConfiguracoesPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Usuário</CardTitle>
-                  <CardDescription>Informações do usuário logado.</CardDescription>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>Usuário</CardTitle>
+                      <CardDescription>Informações do usuário logado.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/png,image/jpeg"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          e.target.value = '';
+                          void handleAvatarPick(f);
+                        }}
+                      />
+                      <div className="h-10 w-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-bold text-muted-foreground">
+                            {(user?.nome || 'U').slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={avatarUploading}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {avatarUploading ? 'Enviando...' : 'Foto'}
+                      </Button>
+                      {avatarPreview ? (
+                        <Button variant="outline" size="sm" onClick={() => void removeAvatar()} disabled={avatarUploading}>
+                          Remover
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid gap-1">

@@ -121,6 +121,7 @@ export interface Usuario {
   email: string;
   empresa_id: string;
   papel: 'owner' | 'admin' | 'cliente';
+  avatar_url?: string;
 }
 
 export interface BrandingConfig {

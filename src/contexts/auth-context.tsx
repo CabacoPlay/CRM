@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   sendAuthToken: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updateUser: (patch: Partial<Usuario>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,12 +98,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('session_token');
   };
 
+  const updateUser = (patch: Partial<Usuario>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      try {
+        const raw = localStorage.getItem('session_token');
+        if (raw) {
+          const parsed = JSON.parse(atob(raw));
+          const merged = { ...parsed, ...patch };
+          localStorage.setItem('session_token', btoa(JSON.stringify(merged)));
+        }
+      } catch {
+        //
+      }
+      return next;
+    });
+  };
+
   const value = {
     user,
     isLoading,
     login,
     logout,
     sendAuthToken,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

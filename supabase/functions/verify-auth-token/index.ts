@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     // Get user data
     const { data: userData, error: userError } = await supabase
       .from('usuarios')
-      .select('id, nome, email, papel, empresa_id, telefone')
+      .select('id, nome, email, papel, empresa_id, telefone, avatar_url')
       .eq('email', email)
       .single();
 
@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
       papel: userData.papel,
       empresa_id: userData.empresa_id,
       telefone: userData.telefone,
+      avatar_url: userData.avatar_url,
       expires_at: expiresAt
     }));
 
@@ -99,7 +100,8 @@ Deno.serve(async (req: Request) => {
           email: userData.email,
           papel: userData.papel,
           empresa_id: userData.empresa_id,
-          telefone: userData.telefone
+          telefone: userData.telefone,
+          avatar_url: userData.avatar_url
         },
         session_token: sessionToken
       }),
