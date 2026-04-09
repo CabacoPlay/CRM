@@ -53,7 +53,7 @@ export function Sidebar() {
       {/* Mobile Overlay */}
       {!sidebarCollapsed && (
         <div 
-          className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm xl:hidden"
           onClick={() => setSidebarCollapsed(true)}
         />
       )}
@@ -61,8 +61,8 @@ export function Sidebar() {
       <aside className={cn(
         "fixed left-0 top-14 sm:top-16 h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40",
         // Mobile: slide in from left, full overlay
-        "lg:translate-x-0",
-        sidebarCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-16" : "translate-x-0 w-64 lg:w-64"
+        "xl:translate-x-0",
+        sidebarCollapsed ? "-translate-x-full xl:translate-x-0 xl:w-16" : "translate-x-0 w-64 xl:w-64"
       )}>
         <div className="p-3 sm:p-4">
           <nav className="space-y-1 sm:space-y-2">
@@ -76,7 +76,7 @@ export function Sidebar() {
                   to={item.href}
                   onClick={() => {
                     // Auto-close sidebar on mobile after navigation
-                    if (window.innerWidth < 1024) {
+                    if (window.innerWidth < 1280) {
                       setSidebarCollapsed(true);
                     }
                   }}
@@ -84,11 +84,11 @@ export function Sidebar() {
                     "flex items-center gap-3 px-3 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition-colors hover:bg-secondary/80",
                     isActive && "bg-primary text-white shadow-md border-l-4 border-secondary font-semibold",
                     !isActive && "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-secondary/50",
-                    sidebarCollapsed && "lg:justify-center lg:px-2"
+                    sidebarCollapsed && "xl:justify-center xl:px-2"
                   )}
                 >
-                  <Icon className={cn("h-5 w-5 shrink-0", sidebarCollapsed && "lg:h-6 lg:w-6")} />
-                  {(!sidebarCollapsed || window.innerWidth < 1024) && (
+                  <Icon className={cn("h-5 w-5 shrink-0", sidebarCollapsed && "xl:h-6 xl:w-6")} />
+                  {(!sidebarCollapsed || window.innerWidth < 1280) && (
                     <span className="truncate">{item.label}</span>
                   )}
                 </Link>

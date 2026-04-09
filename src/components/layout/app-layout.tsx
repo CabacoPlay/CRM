@@ -19,7 +19,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className={cn(
         "pt-4 transition-all duration-300 min-h-[calc(100vh-4rem)]",
         // Desktop sidebar spacing
-        "lg:ml-64 lg:data-[collapsed=true]:ml-16",
+        "xl:ml-64 xl:data-[collapsed=true]:ml-16",
         // Mobile: full width, sidebar overlay
         "ml-0"
       )}

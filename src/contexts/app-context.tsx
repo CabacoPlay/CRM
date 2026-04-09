@@ -103,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [createDefaultBranding]);
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
+    const mq = window.matchMedia('(max-width: 1279px)');
     const apply = () => {
       if (mq.matches) setSidebarCollapsed(true);
     };

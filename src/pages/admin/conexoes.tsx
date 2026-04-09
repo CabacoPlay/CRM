@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Plug, Edit, Trash2, Search, Eye, EyeOff, LayoutGrid, List, RefreshCw, Link2, AlertTriangle, Phone, Building2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -75,12 +75,22 @@ export default function AdminConexoes() {
     globalkey: ''
   });
 
-  // Load data from Supabase
   useEffect(() => {
-    loadData();
+    const mq = window.matchMedia('(max-width: 767px)');
+    const apply = () => {
+      if (mq.matches) setViewMode('grid');
+    };
+    apply();
+    const handler = () => apply();
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+    mq.addListener(handler);
+    return () => mq.removeListener(handler);
   }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -142,7 +152,12 @@ export default function AdminConexoes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Load data from Supabase
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const filteredConexoes = conexoes.filter(conexao =>
     conexao.nome_api.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -363,14 +378,14 @@ export default function AdminConexoes() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-6 px-2 sm:px-0">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold">Conexões</h1>
             <p className="text-muted-foreground">Gerencie as conexões WhatsApp do sistema</p>
           </div>
           
-          <Button onClick={() => { resetForm(); setModalOpen(true); }}>
+          <Button className="w-full sm:w-auto" onClick={() => { resetForm(); setModalOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Conexão
           </Button>
@@ -387,41 +402,45 @@ export default function AdminConexoes() {
               className="pl-9"
             />
           </div>
-          <div className="flex items-center justify-between md:justify-end gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-end gap-3">
+            <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground md:flex md:flex-wrap md:items-center">
               <span>Total: <span className="text-foreground font-medium">{stats.total}</span></span>
               <span>Conectadas: <span className="text-foreground font-medium">{stats.conectadas}</span></span>
               <span>Pendentes: <span className="text-foreground font-medium">{stats.pendentes}</span></span>
               <span>Desconectadas: <span className="text-foreground font-medium">{stats.desconectadas}</span></span>
             </div>
-            <Button variant="outline" onClick={() => void syncNow()} disabled={syncing}>
+            <div className="flex flex-col sm:flex-row gap-2">
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => void syncNow()} disabled={syncing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
               Sincronizar
             </Button>
-            <Button variant="outline" onClick={() => setShowSecrets(v => !v)}>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => setShowSecrets(v => !v)}>
               {showSecrets ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
               {showSecrets ? 'Ocultar chaves' : 'Mostrar chaves'}
             </Button>
-            <ToggleGroup
-              type="single"
-              value={viewMode}
-              onValueChange={(v) => {
-                const next = v === 'table' ? 'table' : 'grid';
-                setViewMode(next);
-                try {
-                  localStorage.setItem('admin_conexoes_view', next);
-                } catch {
-                  //
-                }
-              }}
-            >
-              <ToggleGroupItem value="grid" aria-label="Grade">
-                <LayoutGrid className="h-4 w-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="table" aria-label="Tabela">
-                <List className="h-4 w-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <div className="hidden md:block">
+              <ToggleGroup
+                type="single"
+                value={viewMode}
+                onValueChange={(v) => {
+                  const next = v === 'table' ? 'table' : 'grid';
+                  setViewMode(next);
+                  try {
+                    localStorage.setItem('admin_conexoes_view', next);
+                  } catch {
+                    //
+                  }
+                }}
+              >
+                <ToggleGroupItem value="grid" aria-label="Grade">
+                  <LayoutGrid className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="table" aria-label="Tabela">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            </div>
           </div>
         </div>
 
@@ -563,7 +582,7 @@ export default function AdminConexoes() {
 
       {/* Modal */}
       <Dialog open={modalOpen} onOpenChange={handleModalClose}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingConexao ? 'Editar Conexão' : 'Nova Conexão'}
@@ -671,7 +690,7 @@ export default function AdminConexoes() {
               />
             </div>
             
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2">
               <Button 
                 variant="outline" 
                 onClick={handleModalClose}
