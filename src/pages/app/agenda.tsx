@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -49,6 +49,39 @@ interface Agendamento {
   created_by_user_id?: string | null;
 }
 
+type AgendaSettings = {
+  empresa_id: string;
+  timezone: string;
+  schedule: Record<string, { open: string; close: string }>;
+  slot_interval_minutes: number;
+  min_advance_minutes: number;
+  max_advance_days: number;
+  reminder_hours: number;
+  confirm_template: string | null;
+};
+
+const DEFAULT_SCHEDULE: AgendaSettings['schedule'] = {
+  mon: { open: '08:00', close: '18:00' },
+  tue: { open: '08:00', close: '18:00' },
+  wed: { open: '08:00', close: '18:00' },
+  thu: { open: '08:00', close: '18:00' },
+  fri: { open: '08:00', close: '18:00' },
+  sat: { open: '09:00', close: '13:00' },
+  sun: { open: '00:00', close: '00:00' },
+};
+
+const DAY_LABELS: Record<string, string> = {
+  mon: 'SEG',
+  tue: 'TER',
+  wed: 'QUA',
+  thu: 'QUI',
+  fri: 'SEX',
+  sat: 'SÁB',
+  sun: 'DOM',
+};
+
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
 export default function AgendaPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -80,38 +113,8 @@ export default function AgendaPage() {
   const [contactSearching, setContactSearching] = useState(false);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
 
-  type AgendaSettings = {
-    empresa_id: string;
-    timezone: string;
-    schedule: Record<string, { open: string; close: string }>;
-    slot_interval_minutes: number;
-    min_advance_minutes: number;
-    max_advance_days: number;
-    reminder_hours: number;
-    confirm_template: string | null;
-  };
   const [settings, setSettings] = useState<AgendaSettings | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
-
-  const defaultSchedule: AgendaSettings['schedule'] = {
-    mon: { open: '08:00', close: '18:00' },
-    tue: { open: '08:00', close: '18:00' },
-    wed: { open: '08:00', close: '18:00' },
-    thu: { open: '08:00', close: '18:00' },
-    fri: { open: '08:00', close: '18:00' },
-    sat: { open: '09:00', close: '13:00' },
-    sun: { open: '00:00', close: '00:00' },
-  };
-  const dayLabels: Record<keyof AgendaSettings['schedule'], string> = {
-    mon: 'SEG',
-    tue: 'TER',
-    wed: 'QUA',
-    thu: 'QUI',
-    fri: 'SEX',
-    sat: 'SÁB',
-    sun: 'DOM',
-  };
-  const dayOrder: Array<keyof AgendaSettings['schedule']> = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -123,13 +126,13 @@ export default function AgendaPage() {
         .maybeSingle();
       if (data) {
         const s = data as unknown as AgendaSettings;
-        if (!s.schedule || typeof s.schedule !== 'object') s.schedule = defaultSchedule;
+        if (!s.schedule || typeof s.schedule !== 'object') s.schedule = DEFAULT_SCHEDULE;
         setSettings(s);
       } else {
         setSettings({
           empresa_id: user.empresa_id,
           timezone: 'America/Sao_Paulo',
-          schedule: defaultSchedule,
+          schedule: DEFAULT_SCHEDULE,
           slot_interval_minutes: 30,
           min_advance_minutes: 60,
           max_advance_days: 60,
@@ -182,7 +185,7 @@ export default function AgendaPage() {
           sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${q}%`);
         }
         const { data } = await sel;
-        if (!disposed) setContactResults((data || []) as any);
+        if (!disposed) setContactResults((data || []) as Array<{ id: string; nome: string; contato: string }>);
       } finally {
         if (!disposed) setContactSearching(false);
       }
@@ -195,47 +198,12 @@ export default function AgendaPage() {
   }, [formData.nome_cliente, user?.empresa_id]);
 
   useEffect(() => {
-    if (user?.empresa_id) {
-      fetchAgendamentos();
-
-      // Configurar Realtime para atualizações automáticas
-      const channel = supabase
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'agendamentos',
-            filter: `empresa_id=eq.${user.empresa_id}`
-          },
-          () => {
-            console.log('Mudança detectada no banco, atualizando...');
-            fetchAgendamentos();
-            fetchMonthSummary();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user?.empresa_id, date]);
-
-  useEffect(() => {
     if (date) setCalendarMonth(date);
   }, [date]);
 
-  useEffect(() => {
-    if (!user?.empresa_id) return;
-    fetchMonthSummary();
-  }, [user?.empresa_id, calendarMonth]);
-
   const dateKeyInSP = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-  const monthKeyInSP = (d: Date) => dateKeyInSP(d).slice(0, 7);
 
-  const fetchAgendamentos = async () => {
+  const fetchAgendamentos = useCallback(async () => {
     if (!user?.empresa_id || !date) return;
     
     try {
@@ -270,13 +238,13 @@ export default function AgendaPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [date, toast, user?.empresa_id]);
 
-  const fetchMonthSummary = async () => {
+  const fetchMonthSummary = useCallback(async () => {
     if (!user?.empresa_id) return;
 
     try {
-      const monthKey = monthKeyInSP(calendarMonth);
+      const monthKey = dateKeyInSP(calendarMonth).slice(0, 7);
       const year = Number(monthKey.slice(0, 4));
       const monthIndex = Number(monthKey.slice(5, 7)) - 1;
       const startUtc = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
@@ -308,7 +276,42 @@ export default function AgendaPage() {
       console.error('Erro ao carregar resumo do mês:', error);
       setMonthSummary({});
     }
-  };
+  }, [calendarMonth, user?.empresa_id]);
+
+  useEffect(() => {
+    if (!user?.empresa_id) return;
+    void fetchMonthSummary();
+  }, [fetchMonthSummary, user?.empresa_id]);
+
+  useEffect(() => {
+    if (!user?.empresa_id) return;
+    void fetchAgendamentos();
+  }, [fetchAgendamentos, user?.empresa_id]);
+
+  useEffect(() => {
+    if (!user?.empresa_id) return;
+
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `empresa_id=eq.${user.empresa_id}`,
+        },
+        () => {
+          void fetchAgendamentos();
+          void fetchMonthSummary();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchAgendamentos, fetchMonthSummary, user?.empresa_id]);
 
   const invokeAppointments = async <T,>(payload: Record<string, unknown>): Promise<T> => {
     const token = localStorage.getItem('session_token') || '';
@@ -457,15 +460,19 @@ export default function AgendaPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="space-y-6 animate-in fade-in duration-500 px-2 sm:px-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Agenda & Serviços</h1>
             <p className="text-muted-foreground">Gerencie seus compromissos e deixe a IA agendar por você.</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsSettingsOpen(true)}><Settings className="h-4 w-4 mr-2" /> Configurações</Button>
-            <Button onClick={() => setIsModalOpen(true)}><Plus className="h-4 w-4 mr-2" /> Novo Agendamento</Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="w-full sm:w-auto">
+              <Settings className="h-4 w-4 mr-2" /> Configurações
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" /> Novo Agendamento
+            </Button>
           </div>
         </div>
 
@@ -479,33 +486,35 @@ export default function AgendaPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Calendar
-                mode="single"
-                selected={date}
-                month={calendarMonth}
-                onMonthChange={setCalendarMonth}
-                onSelect={(d) => {
-                  setDate(d);
-                  if (d) setCalendarMonth(d);
-                }}
-                className="rounded-md border shadow-sm mx-auto"
-                modifiers={{
-                  hasConfirmed: (d) => {
-                    const k = dateKeyInSP(d);
-                    return (monthSummary[k]?.confirmed ?? 0) > 0;
-                  },
-                  hasAppointments: (d) => {
-                    const k = dateKeyInSP(d);
-                    const total = monthSummary[k]?.total ?? 0;
-                    const confirmed = monthSummary[k]?.confirmed ?? 0;
-                    return total > 0 && confirmed === 0;
-                  },
-                }}
-                modifiersClassNames={{
-                  hasConfirmed: 'bg-success/15 text-success font-bold hover:bg-success/20',
-                  hasAppointments: 'bg-amber-500/15 text-amber-400 font-bold hover:bg-amber-500/20',
-                }}
-              />
+              <div className="overflow-x-auto -mx-2 px-2">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  month={calendarMonth}
+                  onMonthChange={setCalendarMonth}
+                  onSelect={(d) => {
+                    setDate(d);
+                    if (d) setCalendarMonth(d);
+                  }}
+                  className="rounded-md border shadow-sm mx-auto min-w-[320px]"
+                  modifiers={{
+                    hasConfirmed: (d) => {
+                      const k = dateKeyInSP(d);
+                      return (monthSummary[k]?.confirmed ?? 0) > 0;
+                    },
+                    hasAppointments: (d) => {
+                      const k = dateKeyInSP(d);
+                      const total = monthSummary[k]?.total ?? 0;
+                      const confirmed = monthSummary[k]?.confirmed ?? 0;
+                      return total > 0 && confirmed === 0;
+                    },
+                  }}
+                  modifiersClassNames={{
+                    hasConfirmed: 'bg-success/15 text-success font-bold hover:bg-success/20',
+                    hasAppointments: 'bg-amber-500/15 text-amber-400 font-bold hover:bg-amber-500/20',
+                  }}
+                />
+              </div>
               
               <div className="mt-6 space-y-4">
                 <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Resumo do Dia</h4>
@@ -527,14 +536,14 @@ export default function AgendaPage() {
 
           {/* Appointments List */}
           <Card className="lg:col-span-2 shadow-md border-primary/10 flex flex-col bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-4">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 gap-3">
               <div>
                 <CardTitle className="text-xl">
                   {date?.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </CardTitle>
                 <CardDescription>Visualização detalhada dos compromissos.</CardDescription>
               </div>
-              <Badge variant="secondary" className="h-7 px-3 font-bold">
+              <Badge variant="secondary" className="h-7 px-3 font-bold self-start sm:self-auto">
                 {agendamentos.length} TOTAL
               </Badge>
             </CardHeader>
@@ -556,18 +565,46 @@ export default function AgendaPage() {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="h-[550px] pr-4">
+                <ScrollArea className="h-[60vh] sm:h-[550px] pr-2 sm:pr-4">
                   <div className="space-y-4">
                     {agendamentos.map((appt) => (
-                      <div key={appt.id} className="group relative flex items-start gap-4 p-4 rounded-2xl border bg-card transition-all hover:shadow-lg hover:border-primary/30">
-                        <div className="flex flex-col items-center justify-center p-3 bg-primary/10 text-primary rounded-xl min-w-[70px] border border-primary/20">
-                          <span className="text-xl font-black">{formatTime(appt.data_hora)}</span>
-                          <Clock className="h-3 w-3 mt-1" />
+                      <div
+                        key={appt.id}
+                        className="group relative flex flex-col sm:flex-row items-start gap-4 p-4 rounded-2xl border bg-card transition-all hover:shadow-lg hover:border-primary/30"
+                      >
+                        <div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-0 p-3 bg-primary/10 text-primary rounded-xl w-full sm:w-auto sm:min-w-[70px] border border-primary/20">
+                          <div className="flex items-center gap-2 sm:flex-col sm:gap-0">
+                            <span className="text-xl font-black">{formatTime(appt.data_hora)}</span>
+                            <Clock className="h-3 w-3 sm:mt-1" />
+                          </div>
+                          <div className="sm:hidden">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-9 w-9">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => updateStatus(appt.id, 'Confirmado')}>
+                                  <Check className="h-4 w-4 mr-2 text-success" /> Confirmar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => updateStatus(appt.id, 'Concluído')}>
+                                  <CheckCircle2 className="h-4 w-4 mr-2 text-primary" /> Concluir
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => updateStatus(appt.id, 'Cancelado')} className="text-destructive">
+                                  <X className="h-4 w-4 mr-2" /> Cancelar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteAgendamento(appt.id)} className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" /> Excluir permanentemente
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                         
                         <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-black text-lg">{appt.nome_cliente}</h4>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-black text-lg break-words">{appt.nome_cliente}</h4>
                             <Badge 
                               variant={
                                 appt.status === 'Confirmado' ? 'default' : 
@@ -601,7 +638,7 @@ export default function AgendaPage() {
                           </div>
                         </div>
 
-                        <div className="flex gap-1">
+                        <div className="hidden sm:flex gap-1">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -646,7 +683,7 @@ export default function AgendaPage() {
 
       {/* Modal de Novo Agendamento */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">Novo Agendamento</DialogTitle>
             <DialogDescription>
@@ -708,7 +745,7 @@ export default function AgendaPage() {
                 onChange={(e) => setFormData({...formData, servico: e.target.value})}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="hora" className="font-bold">Horário</Label>
                 <Input 
@@ -747,14 +784,14 @@ export default function AgendaPage() {
       </Dialog>
 
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-[640px]">
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">Configurações da Agenda</DialogTitle>
             <DialogDescription>Defina horários, intervalos e mensagens padrão.</DialogDescription>
           </DialogHeader>
           {settings && (
             <div className="grid gap-4 py-2">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label className="font-bold">Fuso horário</Label>
                   <Input
@@ -774,11 +811,11 @@ export default function AgendaPage() {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {dayOrder.map((day) => {
+                {DAY_ORDER.map((day) => {
                   const v = settings.schedule[day];
                   return (
                   <div key={day} className="border rounded-md p-2">
-                    <div className="text-xs font-bold uppercase mb-1">{dayLabels[day]}</div>
+                    <div className="text-xs font-bold uppercase mb-1">{DAY_LABELS[day]}</div>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="time"
@@ -796,7 +833,7 @@ export default function AgendaPage() {
                 })}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label className="font-bold">Antecedência mínima (min)</Label>
                   <Input
