@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Users, Edit, Trash2, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Users, Edit, Trash2, Search, LayoutGrid, List, Mail, Phone, Building2, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SkeletonTableRow } from '@/components/ui/skeleton';
+import { SkeletonCard, SkeletonTableRow } from '@/components/ui/skeleton';
 import { AppLayout } from '@/components/layout/app-layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // Types for database integration
 interface Usuario {
@@ -44,6 +45,14 @@ export default function AdminUsuarios() {
   const [searchTerm, setSearchTerm] = useState('');
   const [formError, setFormError] = useState('');
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    try {
+      const v = localStorage.getItem('admin_usuarios_view');
+      return v === 'table' ? 'table' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -116,6 +125,13 @@ export default function AdminUsuarios() {
     usuario.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     usuario.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const stats = useMemo(() => {
+    const total = usuarios.length;
+    const admins = usuarios.filter(u => u.papel === 'admin').length;
+    const clientes = total - admins;
+    return { total, admins, clientes };
+  }, [usuarios]);
 
   const handleCreate = async () => {
     if (!formData.nome.trim() || !formData.email.trim()) {
@@ -333,39 +349,6 @@ export default function AdminUsuarios() {
     resetForm();
   };
 
-  if (loading && usuarios.length === 0) {
-    return (
-      <AppLayout>
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">Usuários</h1>
-              <p className="text-muted-foreground">Gerencie os usuários do sistema</p>
-            </div>
-          </div>
-          
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead>Papel</TableHead>
-                <TableHead className="w-24">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <SkeletonTableRow />
-              <SkeletonTableRow />
-              <SkeletonTableRow />
-            </TableBody>
-          </Table>
-        </div>
-      </AppLayout>
-    );
-  }
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -382,8 +365,8 @@ export default function AdminUsuarios() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex justify-between items-center">
-          <div className="relative w-64">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="relative w-full md:w-[360px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar usuários..."
@@ -391,6 +374,33 @@ export default function AdminUsuarios() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
             />
+          </div>
+          <div className="flex items-center justify-between md:justify-end gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Total: <span className="text-foreground font-medium">{stats.total}</span></span>
+              <span>Admins: <span className="text-foreground font-medium">{stats.admins}</span></span>
+              <span>Clientes: <span className="text-foreground font-medium">{stats.clientes}</span></span>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(v) => {
+                const next = v === 'table' ? 'table' : 'grid';
+                setViewMode(next);
+                try {
+                  localStorage.setItem('admin_usuarios_view', next);
+                } catch {
+                  //
+                }
+              }}
+            >
+              <ToggleGroupItem value="grid" aria-label="Grade">
+                <LayoutGrid className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="table" aria-label="Tabela">
+                <List className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </div>
 
@@ -406,51 +416,115 @@ export default function AdminUsuarios() {
             }}
           />
         ) : (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Papel</TableHead>
-                  <TableHead className="w-24">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsuarios.map((usuario) => (
-                  <TableRow key={usuario.id}>
-                    <TableCell className="font-medium">{usuario.nome}</TableCell>
-                    <TableCell>{usuario.telefone}</TableCell>
-                    <TableCell>{usuario.email}</TableCell>
-                    <TableCell>{getEmpresaName(usuario.empresa_id)}</TableCell>
-                    <TableCell>{getPapelBadge(usuario.papel)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(usuario)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8 text-danger"
-                          onClick={() => handleDelete(usuario.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <>
+            {loading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            ) : viewMode === 'table' ? (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Papel</TableHead>
+                      <TableHead className="w-24">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsuarios.map((usuario) => (
+                      <TableRow key={usuario.id}>
+                        <TableCell className="font-medium">{usuario.nome}</TableCell>
+                        <TableCell>{usuario.telefone}</TableCell>
+                        <TableCell>{usuario.email}</TableCell>
+                        <TableCell>{getEmpresaName(usuario.empresa_id)}</TableCell>
+                        <TableCell>{getPapelBadge(usuario.papel)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => handleEdit(usuario)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-danger"
+                              onClick={() => handleDelete(usuario.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredUsuarios.map((u) => {
+                  const letter = String(u.nome || 'U').trim().slice(0, 1).toUpperCase();
+                  return (
+                    <Card key={u.id} className="bg-card/50 backdrop-blur-sm border-primary/10 hover:shadow-lg transition-all">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+                              {letter}
+                            </div>
+                            <div className="min-w-0">
+                              <CardTitle className="text-base truncate">{u.nome}</CardTitle>
+                              <CardDescription className="text-xs truncate">{u.email}</CardDescription>
+                            </div>
+                          </div>
+                          {getPapelBadge(u.papel)}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-3">
+                        <div className="grid gap-2 text-sm">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Phone className="h-4 w-4" />
+                            <span className="truncate">{u.telefone || 'Sem telefone'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Building2 className="h-4 w-4" />
+                            <span className="truncate">{getEmpresaName(u.empresa_id)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            <span className="truncate">{u.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <User className="h-4 w-4" />
+                            <span className="truncate">{u.papel === 'admin' ? 'Admin' : 'Cliente'}</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(u)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </Button>
+                          <Button variant="outline" size="sm" className="text-danger" onClick={() => handleDelete(u.id)}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
