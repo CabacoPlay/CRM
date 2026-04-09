@@ -67,6 +67,11 @@ export default function AdminConexoes() {
   const loadData = async () => {
     try {
       setLoading(true);
+
+      await Promise.race([
+        supabase.functions.invoke('whatsapp-sync-status', { body: { force: false } }),
+        new Promise((r) => setTimeout(r, 1200)),
+      ]);
       
       // Load empresas
       const { data: empresasData, error: empresasError } = await supabase

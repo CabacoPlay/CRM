@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.whatsapp-status]
 verify_jwt = false
 
+[functions.whatsapp-sync-status]
+verify_jwt = false
+
 [functions.whatsapp-inbound]
 verify_jwt = false
 

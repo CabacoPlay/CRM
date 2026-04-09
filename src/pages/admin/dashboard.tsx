@@ -36,11 +36,19 @@ const StatCard = ({ title, value, icon: Icon, description, trend }: any) => (
     <CardContent>
       <div className="text-2xl font-bold">{value}</div>
       <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-        {trend && (
-          <span className={trend > 0 ? "text-success font-medium" : "text-destructive font-medium"}>
+        {trend !== null && trend !== undefined ? (
+          <span
+            className={
+              trend > 0
+                ? "text-success font-medium"
+                : trend < 0
+                  ? "text-destructive font-medium"
+                  : "text-muted-foreground font-medium"
+            }
+          >
             {trend > 0 ? "+" : ""}{trend}%
           </span>
-        )}
+        ) : null}
         {description}
       </p>
     </CardContent>
@@ -92,6 +100,11 @@ export default function AdminDashboard() {
       const now = new Date();
       const msStart = performance.now();
       try {
+        await Promise.race([
+          supabase.functions.invoke('whatsapp-sync-status', { body: {} }),
+          new Promise((r) => setTimeout(r, 1200)),
+        ]);
+
         const start30d = new Date(now.getTime() - 30 * 24 * 60 * 60_000).toISOString();
         const start60d = new Date(now.getTime() - 60 * 24 * 60 * 60_000).toISOString();
         const start7d = new Date(now.getTime() - 7 * 24 * 60 * 60_000).toISOString();
@@ -286,8 +299,9 @@ export default function AdminDashboard() {
                   <YAxis axisLine={false} tickLine={false} tick={{fill: 'hsl(var(--muted-foreground))', fontSize: 12}} />
                   <Tooltip 
                     cursor={{fill: 'hsl(var(--secondary))', opacity: 0.1}}
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                    itemStyle={{ color: 'hsl(var(--primary))' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                   <Bar dataKey="empresas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={40} />
                 </BarChart>
@@ -316,7 +330,9 @@ export default function AdminDashboard() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
