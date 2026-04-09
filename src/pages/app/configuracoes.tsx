@@ -23,6 +23,7 @@ type EmpresaRow = {
   telefone: string | null;
   responsavel: string | null;
   ativa: boolean;
+  logo_url?: string | null;
 };
 
 type EmpresaSettingsRow = {
@@ -104,7 +105,7 @@ export default function ConfiguracoesPage() {
 
       const { data: empresaData } = await supabase
         .from('empresas')
-        .select('id,nome,telefone,responsavel,ativa')
+        .select('id,nome,telefone,responsavel,ativa,logo_url')
         .eq('id', empresaId)
         .maybeSingle();
       setEmpresa((empresaData || null) as any);
@@ -271,8 +272,21 @@ export default function ConfiguracoesPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Empresa</CardTitle>
-                  <CardDescription>Dados da empresa vinculada.</CardDescription>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>Empresa</CardTitle>
+                      <CardDescription>Dados da empresa vinculada.</CardDescription>
+                    </div>
+                    <div className="h-10 w-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                      {empresa?.logo_url ? (
+                        <img src={empresa.logo_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-muted-foreground">
+                          {(empresa?.nome || 'E').slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid gap-1">

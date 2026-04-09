@@ -669,6 +669,7 @@ export type Database = {
           ativa: boolean
           created_at: string
           id: string
+          logo_url: string | null
           nome: string
           responsavel: string | null
           telefone: string | null
@@ -678,6 +679,7 @@ export type Database = {
           ativa?: boolean
           created_at?: string
           id?: string
+          logo_url?: string | null
           nome: string
           responsavel?: string | null
           telefone?: string | null
@@ -687,6 +689,7 @@ export type Database = {
           ativa?: boolean
           created_at?: string
           id?: string
+          logo_url?: string | null
           nome?: string
           responsavel?: string | null
           telefone?: string | null

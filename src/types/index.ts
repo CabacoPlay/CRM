@@ -111,6 +111,7 @@ export interface Empresa {
   responsavel: string;
   ativa: boolean;
   criado_em: string;
+  logo_url?: string;
 }
 
 export interface Usuario {
