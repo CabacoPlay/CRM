@@ -439,6 +439,9 @@ export type Database = {
           globalkey: string | null
           id: string
           id_ia: string | null
+          last_status_checked_at: string | null
+          last_status_error: string | null
+          last_status_raw: string | null
           nome_api: string
           status: string
           telefone: string | null
@@ -452,6 +455,9 @@ export type Database = {
           globalkey?: string | null
           id?: string
           id_ia?: string | null
+          last_status_checked_at?: string | null
+          last_status_error?: string | null
+          last_status_raw?: string | null
           nome_api: string
           status: string
           telefone?: string | null
@@ -465,6 +471,9 @@ export type Database = {
           globalkey?: string | null
           id?: string
           id_ia?: string | null
+          last_status_checked_at?: string | null
+          last_status_error?: string | null
+          last_status_raw?: string | null
           nome_api?: string
           status?: string
           telefone?: string | null

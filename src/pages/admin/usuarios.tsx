@@ -476,7 +476,7 @@ export default function AdminUsuarios() {
                 {filteredUsuarios.map((u) => {
                   const letter = String(u.nome || 'U').trim().slice(0, 1).toUpperCase();
                   return (
-                    <Card key={u.id} className="bg-card/50 backdrop-blur-sm border-primary/10 hover:shadow-lg transition-all">
+                    <Card key={u.id} className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/30 hover:bg-muted/20 hover:shadow-lg transition-all">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
