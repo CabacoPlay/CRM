@@ -48,7 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useSearchParams } from 'react-router-dom';
-const sb: any = supabase;
+const sb = supabase;
 
 type Contato = {
   id: string;
@@ -57,6 +57,10 @@ type Contato = {
   resumo?: string | null;
   profile_img_url?: string | null;
   empresa_id?: string | null;
+  conexao_id?: string | null;
+  oculta?: boolean | null;
+  ai_session_closed_at?: string | null;
+  ai_session_updated_at?: string | null;
   atendimento_mode?: 'ia' | 'humano' | null;
   conversa_status?: 'aberta' | 'resolvida' | null;
   conversa_resolvida_em?: string | null;
@@ -118,6 +122,40 @@ type Etiqueta = {
   nome: string;
   cor?: string | null;
 };
+
+type ContatoEtiquetaLink = {
+  etiqueta_id: string;
+};
+
+type QuickReplyPayload = {
+  empresa_id: string;
+  titulo: string;
+  atalho: string | null;
+  mensagem: string;
+  created_by_user_id: string | null;
+};
+
+type MensagemInsert = {
+  contato_id: string;
+  empresa_id: string | null;
+  direcao: 'in' | 'out';
+  conteudo: string;
+  status: 'pendente' | 'enviado' | 'erro';
+  sender_user_id?: string | null;
+  sender_name?: string | null;
+  tipo?: Mensagem['tipo'];
+  media_url?: string | null;
+  mimetype?: string | null;
+  file_name?: string | null;
+  duration_ms?: number | null;
+  external_id?: string | null;
+  reply_to_message_id?: string | null;
+  reply_to_external_id?: string | null;
+  reply_to_preview?: string | null;
+  conexao_id?: string | null;
+};
+
+type CatalogItem = { id: string; nome: string; descricao?: string | null; valor?: number | null; image_url?: string | null };
 
 function renderWhatsAppText(text: string, keyPrefix: string) {
   const makeKey = (() => {
@@ -234,6 +272,9 @@ export default function ChatPage() {
   const empresaId = user?.empresa_id ?? null;
   const initialContactId = searchParams.get('contato') || '';
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'list' | 'chat'>('list');
+
   const [contacts, setContacts] = useState<Contato[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contato | null>(null);
   const [msgStatus, setMsgStatus] = useState<'IA' | 'Humano'>('IA');
@@ -272,6 +313,25 @@ export default function ChatPage() {
       return [];
     }
   });
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    const handler = () => apply();
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+    mq.addListener(handler);
+    return () => mq.removeListener(handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (selectedContact) setMobilePane('chat');
+  }, [isMobile, selectedContact?.id]);
+
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'agendar' | 'agendados'>('agendar');
   const [scheduleType, setScheduleType] = useState<'text' | 'image' | 'document' | 'audio'>('text');
@@ -325,7 +385,7 @@ export default function ChatPage() {
       setSelectedContact(prev => prev ? { ...prev, atendimento_mode: mode } : prev);
     }
     setMsgStatus(mode === 'ia' ? 'IA' : 'Humano');
-    await sb.from('contatos').update({ atendimento_mode: mode } as any).eq('id', contactId);
+    await sb.from('contatos').update({ atendimento_mode: mode }).eq('id', contactId);
   };
 
   const initials = useMemo(
@@ -366,7 +426,7 @@ export default function ChatPage() {
       .eq('contato_id', selectedContact.id)
       .in('status', ['scheduled', 'error'])
       .order('scheduled_for', { ascending: true });
-    setScheduledItems((data || []) as any);
+    setScheduledItems((data || []) as MensagemAgendada[]);
     setLoadingScheduled(false);
   };
 
@@ -379,7 +439,7 @@ export default function ChatPage() {
       .eq('empresa_id', empresaId)
       .order('updated_at', { ascending: false })
       .limit(200);
-    setQuickReplies((data || []) as any);
+    setQuickReplies((data || []) as RespostaRapida[]);
     setQuickRepliesLoading(false);
   };
 
@@ -397,13 +457,13 @@ export default function ChatPage() {
       toast({ title: 'Campos obrigatórios', description: 'Preencha Título e Mensagem.', variant: 'destructive' });
       return;
     }
-    const payload = {
+    const payload: QuickReplyPayload = {
       empresa_id: empresaId,
       titulo,
       atalho: atalho ? atalho : null,
       mensagem,
       created_by_user_id: user?.id ?? null,
-    } as any;
+    };
     const q = sb.from('respostas_rapidas');
     const { data, error } = quickReplyEditingId
       ? await q.update(payload).eq('id', quickReplyEditingId).select('id,empresa_id,titulo,atalho,mensagem,created_at,updated_at').single()
@@ -413,8 +473,9 @@ export default function ChatPage() {
       return;
     }
     setQuickReplies(prev => {
-      const next = prev.filter(r => r.id !== (data as any).id);
-      return [(data as any) as RespostaRapida, ...next];
+      const saved = data as unknown as RespostaRapida;
+      const next = prev.filter(r => r.id !== saved.id);
+      return [saved, ...next];
     });
     resetQuickReplyForm();
     toast({ title: 'Salvo', description: 'Resposta rápida salva.' });
@@ -461,8 +522,9 @@ export default function ChatPage() {
         .select('etiqueta_id')
         .eq('contato_id', contactId),
     ]);
-    setEtiquetas((etqs || []) as any);
-    setContatoEtiquetaIds((links || []).map((l: any) => String(l.etiqueta_id)));
+    setEtiquetas((etqs || []) as Etiqueta[]);
+    const linkRows = (links || []) as ContatoEtiquetaLink[];
+    setContatoEtiquetaIds(linkRows.map((l) => String(l.etiqueta_id)));
     setEtiquetasLoading(false);
   };
 
@@ -479,8 +541,9 @@ export default function ChatPage() {
 
     if (!error) {
       const map: Record<string, Etiqueta[]> = {};
-      (data || []).forEach((row: any) => {
-        const cid = String(row.contato_id);
+      const rows = (data || []) as Array<{ contato_id: string; etiquetas: { id: string; nome: string; cor: string | null } | null }>;
+      rows.forEach((row) => {
+        const cid = String(row.contato_id || '');
         const et = row.etiquetas;
         if (!cid || !et?.id) return;
         if (!map[cid]) map[cid] = [];
@@ -494,7 +557,8 @@ export default function ChatPage() {
       .from('contato_etiquetas')
       .select('contato_id, etiqueta_id')
       .in('contato_id', contactIds);
-    const etiquetaIds = Array.from(new Set((links || []).map((l: any) => String(l.etiqueta_id)).filter(Boolean)));
+    const linkRows = (links || []) as Array<{ contato_id: string; etiqueta_id: string }>;
+    const etiquetaIds = Array.from(new Set(linkRows.map((l) => String(l.etiqueta_id)).filter(Boolean)));
     if (etiquetaIds.length === 0) {
       setContatoEtiquetasMap({});
       return;
@@ -505,11 +569,12 @@ export default function ChatPage() {
       .eq('empresa_id', empresaId)
       .in('id', etiquetaIds);
     const etMap = new Map<string, Etiqueta>();
-    (etqs || []).forEach((e: any) => {
-      etMap.set(String(e.id), { id: String(e.id), empresa_id: String(e.empresa_id), nome: String(e.nome || ''), cor: e.cor || null });
+    (etqs || []).forEach((e) => {
+      const row = e as unknown as Etiqueta;
+      etMap.set(String(row.id), { id: String(row.id), empresa_id: String(row.empresa_id), nome: String(row.nome || ''), cor: row.cor || null });
     });
     const out: Record<string, Etiqueta[]> = {};
-    (links || []).forEach((l: any) => {
+    linkRows.forEach((l) => {
       const cid = String(l.contato_id);
       const eid = String(l.etiqueta_id);
       const et = etMap.get(eid);
@@ -524,7 +589,7 @@ export default function ChatPage() {
     if (checked) {
       const { error } = await sb
         .from('contato_etiquetas')
-        .upsert({ contato_id: contactId, etiqueta_id: etiquetaId } as any, { onConflict: 'contato_id,etiqueta_id' } as any);
+        .upsert({ contato_id: contactId, etiqueta_id: etiquetaId }, { onConflict: 'contato_id,etiqueta_id' });
       if (error) {
         toast({ title: 'Erro', description: 'Não foi possível adicionar a etiqueta.', variant: 'destructive' });
         return;
@@ -608,7 +673,7 @@ export default function ChatPage() {
     let media_base64: string | null = null;
     let mimetype: string | null = null;
     let file_name: string | null = null;
-    let tipo: any = scheduleType;
+    let tipo: MensagemAgendada['tipo'] = scheduleType;
     if (scheduleType !== 'text') {
       if (!scheduleFile) {
         toast({ title: 'Arquivo obrigatório', description: 'Selecione um arquivo para agendar.', variant: 'destructive' });
@@ -633,7 +698,7 @@ export default function ChatPage() {
       .insert({
         empresa_id: empresaId,
         contato_id: selectedContact.id,
-        conexao_id: (selectedContact as any)?.conexao_id || null,
+        conexao_id: selectedContact.conexao_id || null,
         tipo,
         texto: scheduleText || null,
         media_base64,
@@ -641,14 +706,15 @@ export default function ChatPage() {
         file_name,
         scheduled_for: scheduledFor,
         status: 'scheduled'
-      } as any)
+      })
       .select('id,contato_id,empresa_id,tipo,texto,mimetype,file_name,scheduled_for,status,created_at')
       .single();
     if (error) {
       toast({ title: 'Erro', description: 'Não foi possível agendar a mensagem.', variant: 'destructive' });
       return;
     }
-    setScheduledItems(prev => [...prev, data as any].sort((a: any, b: any) => a.scheduled_for.localeCompare(b.scheduled_for)));
+    const created = data as unknown as MensagemAgendada;
+    setScheduledItems(prev => [...prev, created].sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for)));
     toast({ title: 'Agendado', description: 'Mensagem agendada com sucesso.' });
     setScheduleText('');
     setScheduleFile(null);
@@ -677,7 +743,7 @@ export default function ChatPage() {
       .insert({
         empresa_id: empresaId,
         contato_id: selectedContact.id,
-        conexao_id: (selectedContact as any)?.conexao_id || null,
+        conexao_id: selectedContact.conexao_id || null,
         tipo,
         texto: null,
         media_base64,
@@ -685,7 +751,7 @@ export default function ChatPage() {
         file_name,
         scheduled_for: new Date().toISOString(),
         status: 'scheduled'
-      } as any);
+      });
 
     if (error) {
       toast({ title: 'Erro', description: 'Não foi possível enviar o arquivo.', variant: 'destructive' });
@@ -697,7 +763,7 @@ export default function ChatPage() {
   };
 
   const cancelScheduled = async (id: string) => {
-    const { error } = await sb.from('mensagens_agendadas').update({ status: 'cancelled' } as any).eq('id', id);
+    const { error } = await sb.from('mensagens_agendadas').update({ status: 'cancelled' }).eq('id', id);
     if (error) {
       toast({ title: 'Erro', description: 'Não foi possível cancelar.', variant: 'destructive' });
       return;
@@ -764,7 +830,7 @@ export default function ChatPage() {
   const setConversationResolved = async (contactId: string, resolved: boolean) => {
     if (!empresaId) return;
     const nowIso = new Date().toISOString();
-    const payload = resolved
+    const payload: Partial<Contato> = resolved
       ? {
           conversa_status: 'resolvida',
           conversa_resolvida_em: nowIso,
@@ -774,12 +840,12 @@ export default function ChatPage() {
           ai_session_updated_at: nowIso,
         }
       : { conversa_status: 'aberta', conversa_resolvida_em: null, conversa_resolvida_por: null };
-    const { error } = await sb.from('contatos').update(payload as any).eq('id', contactId);
+    const { error } = await sb.from('contatos').update(payload).eq('id', contactId);
     if (error) {
       toast({ title: 'Erro', description: 'Não foi possível atualizar o status da conversa.', variant: 'destructive' });
       return;
     }
-    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...(payload as any) } : c));
+    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...payload } : c));
     if (selectedContact?.id === contactId) {
       if (resolved) {
         setMsgStatus('IA');
@@ -805,9 +871,9 @@ export default function ChatPage() {
 
     try {
       await clearConversation(id);
-      const { error: upErr } = await sb.from('contatos').update({ oculta: true, resumo: null } as any).eq('id', id);
+      const { error: upErr } = await sb.from('contatos').update({ oculta: true, resumo: null }).eq('id', id);
       if (!upErr) {
-        setContacts(prev => prev.map(c => c.id === id ? { ...c, oculta: true, resumo: null } as any : c));
+        setContacts(prev => prev.map(c => c.id === id ? { ...c, oculta: true, resumo: null } : c));
       }
       toast({ title: 'Concluído', description: 'Conversa apagada.' });
     } catch (e) {
@@ -889,7 +955,7 @@ export default function ChatPage() {
     if (!target || target.status === 'pendente') return;
     const { error } = await sb
       .from('mensagens')
-      .update({ reacao_emoji: emoji, reacao_direcao: 'out', reacao_em: nowIso } as any)
+      .update({ reacao_emoji: emoji, reacao_direcao: 'out', reacao_em: nowIso })
       .eq('id', msgId);
     if (error) {
       toast({ title: 'Erro', description: 'Não foi possível salvar a reação.', variant: 'destructive' });
@@ -947,7 +1013,7 @@ export default function ChatPage() {
     setLastMessages(prev => ({ ...prev, [target.id]: { conteudo: getMessageSnippet(optimistic), created_at: optimistic.created_at } }));
 
     try {
-      const payloadFull: any = {
+      const payloadFull: MensagemInsert = {
         contato_id: target.id,
         empresa_id: empresaId,
         direcao: 'out',
@@ -958,26 +1024,27 @@ export default function ChatPage() {
       };
       let { data: inserted, error } = await sb.from('mensagens').insert(payloadFull).select().single();
       if (error && String(error.message || '').includes("sender_")) {
-        const payloadFallback = {
+        const payloadFallback: MensagemInsert = {
           contato_id: target.id,
           empresa_id: empresaId,
           direcao: 'out',
           conteudo: content,
           status: 'pendente'
-        } as any;
+        };
         const res2 = await sb.from('mensagens').insert(payloadFallback).select().single();
         inserted = res2.data;
         error = res2.error;
       }
       if (error) throw error;
-      await sb.functions.invoke('whatsapp-send', { body: { message_id: inserted.id, sender_name: user?.nome ?? null } });
+      const insertedRow = inserted as unknown as Mensagem;
+      await sb.functions.invoke('whatsapp-send', { body: { message_id: insertedRow.id, sender_name: user?.nome ?? null } });
       if (selectedContact?.id === target.id) {
         setMessages(prev => {
-          const hasInserted = prev.some(m => m.id === inserted.id);
+          const hasInserted = prev.some(m => m.id === insertedRow.id);
           if (hasInserted) {
-            return prev.filter(m => m.id !== optimistic.id).map(m => m.id === inserted.id ? { ...m, status: 'enviado' } : m);
+            return prev.filter(m => m.id !== optimistic.id).map(m => m.id === insertedRow.id ? { ...m, status: 'enviado' } : m);
           }
-          return prev.map(m => m.id === optimistic.id ? { ...m, id: inserted.id, status: 'enviado' } : m);
+          return prev.map(m => m.id === optimistic.id ? { ...m, id: insertedRow.id, status: 'enviado' } : m);
         });
       }
       toast({ title: 'Encaminhado', description: `Mensagem enviada para ${target.nome}.` });
@@ -1125,7 +1192,8 @@ export default function ChatPage() {
         return;
       }
       const map: Record<string, { conteudo: string; created_at: string }> = {};
-      (data || []).forEach((m: any) => {
+      const rows = (data || []) as Array<{ contato_id: string; conteudo: string; created_at: string }>;
+      rows.forEach((m) => {
         const cid = m.contato_id as string;
         if (!map[cid]) {
           map[cid] = { conteudo: m.conteudo as string, created_at: m.created_at as string };
@@ -1180,8 +1248,8 @@ export default function ChatPage() {
           return [...prev, incoming];
         });
         // Atualiza preview
-        const m = payload.new as any;
-        const previewText = stripSignature(m.conteudo || '', (m as any).sender_name || null);
+        const m = payload.new as unknown as Mensagem;
+        const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
         setLastMessages(prev => ({ ...prev, [m.contato_id]: { conteudo: previewText, created_at: m.created_at } }));
         // Scroll
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
@@ -1203,9 +1271,9 @@ export default function ChatPage() {
     const ch = sb
       .channel(`msgs-preview-${empresaId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `empresa_id=eq.${empresaId}` }, payload => {
-        const m = payload.new as any;
+        const m = payload.new as unknown as Mensagem;
         if (!m?.contato_id) return;
-        const previewText = stripSignature(m.conteudo || '', (m as any).sender_name || null);
+        const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
         setLastMessages(prev => ({ ...prev, [m.contato_id]: { conteudo: previewText, created_at: m.created_at } }));
       })
       .subscribe();
@@ -1249,7 +1317,7 @@ export default function ChatPage() {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
 
     try {
-      const payloadFull: any = {
+      const payloadFull: MensagemInsert = {
         contato_id: selectedContact.id,
         empresa_id: empresaId,
         direcao: 'out',
@@ -1263,29 +1331,30 @@ export default function ChatPage() {
       };
       let { data: inserted, error } = await sb.from('mensagens').insert(payloadFull).select().single();
       if (error && String(error.message || '').includes("sender_")) {
-        const payloadFallback = {
+        const payloadFallback: MensagemInsert = {
           contato_id: selectedContact.id,
           empresa_id: empresaId,
           direcao: 'out',
           conteudo: text,
           status: 'pendente'
-        } as any;
+        };
         const res2 = await sb.from('mensagens').insert(payloadFallback).select().single();
         inserted = res2.data;
         error = res2.error;
       }
       if (error) throw error;
+      const insertedRow = inserted as unknown as Mensagem;
       // Disparar envio com assinatura (backend pode usar sender_name override)
-      await sb.functions.invoke('whatsapp-send', { body: { message_id: inserted.id, sender_name: user?.nome ?? null } });
+      await sb.functions.invoke('whatsapp-send', { body: { message_id: insertedRow.id, sender_name: user?.nome ?? null } });
       // Atualizar status localmente
       setMessages(prev => {
-        const hasInserted = prev.some(m => m.id === inserted.id);
+        const hasInserted = prev.some(m => m.id === insertedRow.id);
         if (hasInserted) {
           return prev
             .filter(m => m.id !== optimistic.id)
-            .map(m => m.id === inserted.id ? { ...m, status: 'enviado' } : m);
+            .map(m => m.id === insertedRow.id ? { ...m, status: 'enviado' } : m);
         }
-        return prev.map(m => m.id === optimistic.id ? { ...m, id: inserted.id, status: 'enviado' } : m);
+        return prev.map(m => m.id === optimistic.id ? { ...m, id: insertedRow.id, status: 'enviado' } : m);
       });
     } catch (e) {
       console.error(e);
@@ -1339,7 +1408,7 @@ export default function ChatPage() {
       .limit(50);
     if (q) sel = sel.or(`nome.ilike.%${q}%,descricao.ilike.%${q}%`);
     const { data } = await sel;
-    setCatalogItems((data || []) as any);
+    setCatalogItems((data || []) as CatalogItem[]);
     setCatalogLoading(false);
   }, [catalogQuery, empresaId]);
 
@@ -1375,7 +1444,7 @@ export default function ChatPage() {
     const mimetype = guessMimeFromUrl(item.image_url);
     const fileName = `${String(item.nome || 'item').slice(0, 32)}.${mimetype === 'image/png' ? 'png' : mimetype === 'image/webp' ? 'webp' : mimetype === 'image/gif' ? 'gif' : 'jpg'}`;
     try {
-      const payload: any = {
+      const payload: MensagemInsert = {
         empresa_id: empresaId,
         contato_id: selectedContact.id,
         direcao: 'out',
@@ -1390,9 +1459,17 @@ export default function ChatPage() {
       }
       let { data: inserted, error } = await sb.from('mensagens').insert(payload).select('id').single();
       if (error && String(error.message || '').includes('sender_')) {
-        const fallback: any = { ...payload };
-        delete fallback.sender_user_id;
-        delete fallback.sender_name;
+        const fallback: MensagemInsert = {
+          empresa_id: payload.empresa_id,
+          contato_id: payload.contato_id,
+          direcao: payload.direcao,
+          conteudo: payload.conteudo,
+          status: payload.status,
+          tipo: payload.tipo,
+          media_url: payload.media_url ?? null,
+          mimetype: payload.mimetype ?? null,
+          file_name: payload.file_name ?? null,
+        };
         const res2 = await sb.from('mensagens').insert(fallback).select('id').single();
         inserted = res2.data;
         error = res2.error;
@@ -1425,7 +1502,7 @@ export default function ChatPage() {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
 
     try {
-      const payloadFull: any = {
+      const payloadFull: MensagemInsert = {
         contato_id: selectedContact.id,
         empresa_id: empresaId,
         direcao: 'out',
@@ -1436,25 +1513,26 @@ export default function ChatPage() {
       };
       let { data: inserted, error } = await sb.from('mensagens').insert(payloadFull).select().single();
       if (error && String(error.message || '').includes("sender_")) {
-        const payloadFallback = {
+        const payloadFallback: MensagemInsert = {
           contato_id: selectedContact.id,
           empresa_id: empresaId,
           direcao: 'out',
           conteudo: `sticker:${dataUrl}`,
           status: 'pendente'
-        } as any;
+        };
         const res2 = await sb.from('mensagens').insert(payloadFallback).select().single();
         inserted = res2.data;
         error = res2.error;
       }
       if (error) throw error;
-      await sb.functions.invoke('whatsapp-send', { body: { message_id: inserted.id, sender_name: user?.nome ?? null } });
+      const insertedRow = inserted as unknown as Mensagem;
+      await sb.functions.invoke('whatsapp-send', { body: { message_id: insertedRow.id, sender_name: user?.nome ?? null } });
       setMessages(prev => {
-        const hasInserted = prev.some(m => m.id === inserted.id);
+        const hasInserted = prev.some(m => m.id === insertedRow.id);
         if (hasInserted) {
-          return prev.filter(m => m.id !== optimistic.id).map(m => m.id === inserted.id ? { ...m, status: 'enviado' } : m);
+          return prev.filter(m => m.id !== optimistic.id).map(m => m.id === insertedRow.id ? { ...m, status: 'enviado' } : m);
         }
-        return prev.map(m => m.id === optimistic.id ? { ...m, id: inserted.id, status: 'enviado' } : m);
+        return prev.map(m => m.id === optimistic.id ? { ...m, id: insertedRow.id, status: 'enviado' } : m);
       });
       setRecentStickers(prev => {
         const nextList = [dataUrl, ...prev.filter(s => s !== dataUrl)].slice(0, 12);
@@ -1501,7 +1579,7 @@ export default function ChatPage() {
     const list = contacts
       .filter(c => {
         const status = c.conversa_status || 'aberta';
-        const isOculta = (c as any).oculta === true;
+        const isOculta = c.oculta === true;
         return conversaTab === 'resolvidas' ? (status === 'resolvida' && !isOculta) : (status !== 'resolvida' && !isOculta);
       })
       .filter(c => {
@@ -1540,9 +1618,15 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="flex h-[calc(100vh-100px)] overflow-hidden rounded-xl border bg-background shadow-lg w-full">
+      <div className="flex h-[calc(100dvh-100px)] overflow-hidden rounded-xl border bg-background shadow-lg w-full flex-col md:flex-row">
         {/* Contacts Sidebar */}
-        <div className="w-80 border-r flex flex-col bg-card/50">
+        <div
+          className={cn(
+            "flex-col bg-card/50 md:border-r",
+            isMobile ? "w-full" : "w-80",
+            isMobile && mobilePane === "chat" ? "hidden" : "flex",
+          )}
+        >
           <div className="p-4 border-b">
             <h2 className="text-xl font-bold mb-4">Conversas</h2>
             <div className="relative">
@@ -1586,6 +1670,7 @@ export default function ChatPage() {
                   onClick={() => {
                     setSelectedContact(contact);
                     setMsgStatus(contact.atendimento_mode === 'humano' ? 'Humano' : 'IA');
+                    if (isMobile) setMobilePane('chat');
                   }}
                   onContextMenu={(e) => openContactMenu(e, contact)}
                   className={cn(
@@ -1641,7 +1726,12 @@ export default function ChatPage() {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-accent/5">
+        <div
+          className={cn(
+            "flex-1 flex-col bg-accent/5 min-w-0",
+            isMobile && mobilePane === "list" ? "hidden" : "flex",
+          )}
+        >
           {!selectedContact && (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center opacity-80">
@@ -1661,6 +1751,20 @@ export default function ChatPage() {
           {/* Chat Header */}
           <div className="p-4 border-b flex items-center justify-between bg-background">
             <div className="flex items-center gap-3">
+              {isMobile ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => {
+                    setMobilePane('list');
+                    setSelectedContact(null);
+                    setMessages([]);
+                  }}
+                >
+                  <CornerUpLeft className="h-4 w-4" />
+                </Button>
+              ) : null}
               <Avatar>
                 <AvatarImage src={selectedContact?.profile_img_url || ''} />
                 <AvatarFallback>{initials}</AvatarFallback>
@@ -2003,7 +2107,7 @@ export default function ChatPage() {
                     <Paperclip className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-64 p-2">
+                <PopoverContent align="start" className="w-64 max-w-[calc(100vw-2rem)] p-2">
                   <div className="flex flex-col">
                     <Button variant="ghost" className="justify-start gap-3" onClick={() => openImmediateUpload('document')}>
                       <FileText className="h-5 w-5" /> Documento
@@ -2056,8 +2160,8 @@ export default function ChatPage() {
                     <Smile className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-[360px] p-2">
-                  <Tabs value={pickerTab} onValueChange={(v) => setPickerTab(v as any)}>
+                <PopoverContent align="start" className="w-[360px] max-w-[calc(100vw-2rem)] p-2">
+                  <Tabs value={pickerTab} onValueChange={(v) => setPickerTab(v === 'stickers' ? 'stickers' : 'emoji')}>
                     <TabsList className="grid grid-cols-2 w-full">
                       <TabsTrigger value="emoji">Emoji</TabsTrigger>
                       <TabsTrigger value="stickers">Figurinhas</TabsTrigger>
@@ -2292,7 +2396,7 @@ export default function ChatPage() {
             <DialogDescription>Crie respostas prontas e use no chat com 1 clique.</DialogDescription>
           </DialogHeader>
 
-          <Tabs value={quickRepliesTab} onValueChange={(v) => setQuickRepliesTab(v as any)}>
+          <Tabs value={quickRepliesTab} onValueChange={(v) => setQuickRepliesTab(v === 'configurar' ? 'configurar' : 'usar')}>
             <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="usar">Usar</TabsTrigger>
               <TabsTrigger value="configurar">Configurar</TabsTrigger>
@@ -2566,14 +2670,19 @@ export default function ChatPage() {
             <DialogDescription>Agende uma mensagem para enviar automaticamente no WhatsApp.</DialogDescription>
           </DialogHeader>
 
-          <Tabs value={scheduleView} onValueChange={(v) => setScheduleView(v as any)}>
+          <Tabs value={scheduleView} onValueChange={(v) => setScheduleView(v === 'agendados' ? 'agendados' : 'agendar')}>
             <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="agendar">Agendar</TabsTrigger>
               <TabsTrigger value="agendados">Agendados</TabsTrigger>
             </TabsList>
 
             <TabsContent value="agendar" className="space-y-4">
-              <Tabs value={scheduleType} onValueChange={(v) => setScheduleType(v as any)}>
+              <Tabs
+                value={scheduleType}
+                onValueChange={(v) =>
+                  setScheduleType(v === 'image' || v === 'document' || v === 'audio' ? v : 'text')
+                }
+              >
                 <TabsList className="grid grid-cols-4 w-full">
                   <TabsTrigger value="text">Texto</TabsTrigger>
                   <TabsTrigger value="image">Imagem</TabsTrigger>

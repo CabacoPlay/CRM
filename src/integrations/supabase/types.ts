@@ -568,8 +568,156 @@ export type Database = {
           },
         ]
       }
+      contato_etiquetas: {
+        Row: {
+          contato_id: string
+          etiqueta_id: string
+          created_at: string
+        }
+        Insert: {
+          contato_id: string
+          etiqueta_id: string
+          created_at?: string
+        }
+        Update: {
+          contato_id?: string
+          etiqueta_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contato_etiquetas_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contato_etiquetas_etiqueta_id_fkey"
+            columns: ["etiqueta_id"]
+            isOneToOne: false
+            referencedRelation: "etiquetas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      etiquetas: {
+        Row: {
+          id: string
+          empresa_id: string | null
+          nome: string
+          cor: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string | null
+          nome: string
+          cor?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string | null
+          nome?: string
+          cor?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etiquetas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mensagens_agendadas: {
+        Row: {
+          id: string
+          empresa_id: string
+          contato_id: string
+          conexao_id: string | null
+          tipo: string
+          texto: string | null
+          media_base64: string | null
+          mimetype: string | null
+          file_name: string | null
+          scheduled_for: string
+          status: string
+          sent_at: string | null
+          external_id: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id: string
+          contato_id: string
+          conexao_id?: string | null
+          tipo: string
+          texto?: string | null
+          media_base64?: string | null
+          mimetype?: string | null
+          file_name?: string | null
+          scheduled_for: string
+          status?: string
+          sent_at?: string | null
+          external_id?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          contato_id?: string
+          conexao_id?: string | null
+          tipo?: string
+          texto?: string | null
+          media_base64?: string | null
+          mimetype?: string | null
+          file_name?: string | null
+          scheduled_for?: string
+          status?: string
+          sent_at?: string | null
+          external_id?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_agendadas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_agendadas_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_agendadas_conexao_id_fkey"
+            columns: ["conexao_id"]
+            isOneToOne: false
+            referencedRelation: "conexoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mensagens: {
         Row: {
+          ai_dispatched_at: string | null
           conexao_id: string | null
           contato_id: string
           conteudo: string
@@ -582,6 +730,9 @@ export type Database = {
           id: string
           media_url: string | null
           mimetype: string | null
+          reacao_direcao: string | null
+          reacao_em: string | null
+          reacao_emoji: string | null
           reply_to_external_id: string | null
           reply_to_message_id: string | null
           reply_to_preview: string | null
@@ -592,6 +743,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ai_dispatched_at?: string | null
           conexao_id?: string | null
           contato_id: string
           conteudo: string
@@ -604,6 +756,9 @@ export type Database = {
           id?: string
           media_url?: string | null
           mimetype?: string | null
+          reacao_direcao?: string | null
+          reacao_em?: string | null
+          reacao_emoji?: string | null
           reply_to_external_id?: string | null
           reply_to_message_id?: string | null
           reply_to_preview?: string | null
@@ -614,6 +769,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ai_dispatched_at?: string | null
           conexao_id?: string | null
           contato_id?: string
           conteudo?: string
@@ -626,6 +782,9 @@ export type Database = {
           id?: string
           media_url?: string | null
           mimetype?: string | null
+          reacao_direcao?: string | null
+          reacao_em?: string | null
+          reacao_emoji?: string | null
           reply_to_external_id?: string | null
           reply_to_message_id?: string | null
           reply_to_preview?: string | null
@@ -667,6 +826,54 @@ export type Database = {
           {
             foreignKeyName: "mensagens_sender_user_id_fkey"
             columns: ["sender_user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      respostas_rapidas: {
+        Row: {
+          id: string
+          empresa_id: string
+          titulo: string
+          atalho: string | null
+          mensagem: string
+          created_by_user_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id: string
+          titulo: string
+          atalho?: string | null
+          mensagem: string
+          created_by_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          titulo?: string
+          atalho?: string | null
+          mensagem?: string
+          created_by_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_rapidas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "respostas_rapidas_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
