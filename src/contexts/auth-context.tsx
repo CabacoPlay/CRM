@@ -51,6 +51,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    const fillMissingAvatar = async () => {
+      if (!user?.id) return;
+      // if session has no avatar_url, try to load from DB to keep header consistent
+      // do not block UI; best-effort only
+      if ((user as any).avatar_url === undefined || (user as any).avatar_url === null) {
+        try {
+          const { data } = await supabase.from('usuarios').select('avatar_url').eq('id', user.id).maybeSingle();
+          const url = (data as any)?.avatar_url || null;
+          if (url) {
+            const raw = localStorage.getItem('session_token');
+            if (raw) {
+              try {
+                const parsed = JSON.parse(atob(raw));
+                parsed.avatar_url = url;
+                localStorage.setItem('session_token', btoa(JSON.stringify(parsed)));
+              } catch {
+                // ignore
+              }
+            }
+            setUser(prev => (prev ? ({ ...prev, avatar_url: url } as any) : prev));
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+    void fillMissingAvatar();
+  }, [user?.id]);
+
   const sendAuthToken = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke('send-auth-token', {
