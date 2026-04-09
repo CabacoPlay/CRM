@@ -112,6 +112,13 @@ export interface Empresa {
   ativa: boolean;
   criado_em: string;
   logo_url?: string;
+  billing_enabled?: boolean;
+  billing_plan?: string;
+  billing_due_date?: string | null;
+  billing_grace_days?: number;
+  billing_status?: string;
+  billing_price_cents?: number | null;
+  billing_currency?: string;
 }
 
 export interface Usuario {

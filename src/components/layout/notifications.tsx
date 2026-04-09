@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
 
 type NotificationType = 'message' | 'alert' | 'success' | 'ia';
 
@@ -22,6 +23,7 @@ interface SystemNotification {
   createdAt: string;
   read: boolean;
   type: NotificationType;
+  persisted?: boolean;
   meta?: {
     contatoId?: string;
   };
@@ -53,10 +55,11 @@ type AgendamentoRow = {
 export function SystemNotifications() {
   const { user } = useAuth();
   const empresaId = user?.empresa_id ?? null;
+  const { toast } = useToast();
 
   const storageKey = useMemo(() => (empresaId ? `system_notifications:${empresaId}` : 'system_notifications'), [empresaId]);
 
-  const [notifications, setNotifications] = useState<SystemNotification[]>(() => {
+  const [localNotifications, setLocalNotifications] = useState<SystemNotification[]>(() => {
     try {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return [];
@@ -68,7 +71,7 @@ export function SystemNotifications() {
     }
   });
 
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [dbNotifications, setDbNotifications] = useState<SystemNotification[]>([]);
   const [open, setOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const contactNameCache = useRef<Map<string, string>>(new Map());
@@ -78,26 +81,65 @@ export function SystemNotifications() {
     try {
       const raw = localStorage.getItem(storageKey);
       const parsed = raw ? (JSON.parse(raw) as SystemNotification[]) : [];
-      setNotifications(Array.isArray(parsed) ? parsed.slice(0, 50) : []);
+      setLocalNotifications(Array.isArray(parsed) ? parsed.slice(0, 50) : []);
       contactNameCache.current = new Map();
       notifiedIds.current = new Set((Array.isArray(parsed) ? parsed : []).map(n => n.id));
     } catch {
-      setNotifications([]);
+      setLocalNotifications([]);
       contactNameCache.current = new Map();
       notifiedIds.current = new Set();
     }
   }, [storageKey]);
 
   useEffect(() => {
-    setUnreadCount(notifications.filter(n => !n.read).length);
-  }, [notifications]);
+    const loadDb = async () => {
+      if (!user?.id) {
+        setDbNotifications([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('user_notifications')
+        .select('id,title,description,type,created_at,read_at,meta')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      const rows = (data || []) as any[];
+      const mapped = rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          createdAt: r.created_at,
+          read: Boolean(r.read_at),
+          type: (r.type as NotificationType) || 'alert',
+          persisted: true,
+          meta: r.meta || undefined,
+        }));
+
+      const latestUnread = mapped.find(n => !n.read) || null;
+      if (latestUnread && document.visibilityState === 'visible') {
+        const key = `user_notifications:last_toast:${user.id}`;
+        try {
+          const last = localStorage.getItem(key);
+          if (last !== latestUnread.id) {
+            localStorage.setItem(key, latestUnread.id);
+            toast({ title: latestUnread.title, description: latestUnread.description });
+          }
+        } catch {
+          //
+        }
+      }
+
+      setDbNotifications(mapped);
+    };
+    loadDb();
+  }, [toast, user?.id]);
 
   useEffect(() => {
     const handler = (evt: Event) => {
       const e = evt as CustomEvent<{ contatoId?: string }>;
       const contatoId = String(e.detail?.contatoId || '').trim();
       if (!contatoId) return;
-      setNotifications(prev =>
+      setLocalNotifications(prev =>
         prev.map(n => {
           if (n.read) return n;
           if (n.type !== 'message') return n;
@@ -112,11 +154,19 @@ export function SystemNotifications() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(notifications.slice(0, 50)));
+      localStorage.setItem(storageKey, JSON.stringify(localNotifications.slice(0, 50)));
     } catch {
       return;
     }
-  }, [notifications, storageKey]);
+  }, [localNotifications, storageKey]);
+
+  const notifications = useMemo(() => {
+    const merged = [...dbNotifications, ...localNotifications];
+    merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return merged.slice(0, 50);
+  }, [dbNotifications, localNotifications]);
+
+  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
 
   useEffect(() => {
     notifiedIds.current = new Set(notifications.map(n => n.id));
@@ -154,14 +204,21 @@ export function SystemNotifications() {
     }
   }, []);
 
-  const addNotification = useCallback((notification: SystemNotification) => {
+  const addNotification = useCallback((notification: SystemNotification, showToast: boolean) => {
     if (notifiedIds.current.has(notification.id)) return;
     notifiedIds.current.add(notification.id);
 
-    setNotifications(prev => [notification, ...prev].slice(0, 50));
+    if (notification.persisted) {
+      setDbNotifications(prev => [notification, ...prev].slice(0, 50));
+    } else {
+      setLocalNotifications(prev => [notification, ...prev].slice(0, 50));
+    }
     playNotificationSound();
     showBrowserNotification(notification.title, notification.description);
-  }, [playNotificationSound, showBrowserNotification]);
+    if (showToast && document.visibilityState === 'visible') {
+      toast({ title: notification.title, description: notification.description });
+    }
+  }, [playNotificationSound, showBrowserNotification, toast]);
 
   const resolveContactName = useCallback(async (contactId: string) => {
     const cached = contactNameCache.current.get(contactId);
@@ -193,7 +250,7 @@ export function SystemNotifications() {
             read: false,
             type: 'message',
             meta: { contatoId: msg.contato_id }
-          });
+          }, true);
         }
       )
       .on(
@@ -215,7 +272,7 @@ export function SystemNotifications() {
             createdAt: newRow.updated_at || new Date().toISOString(),
             read: false,
             type: newRow.atendimento_mode === 'ia' ? 'ia' : 'alert'
-          });
+          }, true);
         }
       )
       .on(
@@ -239,7 +296,7 @@ export function SystemNotifications() {
             createdAt: row.updated_at || new Date().toISOString(),
             read: false,
             type: row.status === 'Cancelado' ? 'alert' : 'success'
-          });
+          }, true);
         }
       )
       .subscribe();
@@ -249,12 +306,51 @@ export function SystemNotifications() {
     };
   }, [addNotification, empresaId, resolveContactName]);
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`user-notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new as any;
+          addNotification({
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            createdAt: row.created_at || new Date().toISOString(),
+            read: Boolean(row.read_at),
+            type: (row.type as NotificationType) || 'alert',
+            persisted: true,
+            meta: row.meta || undefined,
+          }, true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [addNotification, user?.id]);
+
+  const markAsRead = async (id: string) => {
+    const target = notifications.find(n => n.id === id);
+    if (!target || target.read) return;
+    if (target.persisted && user?.id) {
+      await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id);
+      setDbNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      return;
+    }
+    setLocalNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    if (user?.id) {
+      await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user.id).is('read_at', null);
+      setDbNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }
+    setLocalNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const getIcon = (type: string) => {
@@ -316,7 +412,7 @@ export function SystemNotifications() {
             notifications.map((n) => (
               <div
                 key={n.id}
-                onClick={() => markAsRead(n.id)}
+                onClick={() => void markAsRead(n.id)}
                 className={cn(
                   "p-4 border-b last:border-0 cursor-pointer transition-colors hover:bg-accent/50 flex gap-3",
                   !n.read && "bg-primary/5"

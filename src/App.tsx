@@ -19,10 +19,13 @@ import Catalogo from "./pages/app/catalogo";
 import CRM from "./pages/app/crm";
 import ConfiguracoesPage from "./pages/app/configuracoes";
 import OrcamentosPage from "./pages/app/orcamentos";
+import PagamentoPage from "./pages/app/pagamento";
 import AdminEmpresas from "./pages/admin/empresas";
 import AdminUsuarios from "./pages/admin/usuarios";
 import AdminConexoes from "./pages/admin/conexoes";
 import AdminBranding from "./pages/admin/branding";
+import AdminPlanosFaturas from "./pages/admin/planos-faturas";
+import AdminPagamentosConfig from "./pages/admin/pagamentos-config";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/auth";
 
@@ -94,6 +97,11 @@ const App = () => (
                     <OrcamentosPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/app/pagamento" element={
+                  <ProtectedRoute>
+                    <PagamentoPage />
+                  </ProtectedRoute>
+                } />
                 <Route path="/admin/dashboard" element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminDashboard />
@@ -117,6 +125,16 @@ const App = () => (
                 <Route path="/admin/branding" element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminBranding />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/planos-faturas" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminPlanosFaturas />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/pagamentos-config" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminPagamentosConfig />
                   </ProtectedRoute>
                 } />
                 <Route path="*" element={<NotFound />} />

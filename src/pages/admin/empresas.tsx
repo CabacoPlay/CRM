@@ -15,7 +15,26 @@ import { Empresa } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { normalizePlan, planIsBillable, planLabel, planLimits } from '@/lib/billing-plans';
 
+function moneyToCents(input: string) {
+  const s = String(input || '').trim().replace(/\s/g, '');
+  if (!s) return null;
+  const n = s.replace(/\./g, '').replace(',', '.');
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  return Math.round(v * 100);
+}
+
+function centsToMoney(cents: number) {
+  try {
+    const v = (cents || 0) / 100;
+    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch {
+    return String((cents || 0) / 100);
+  }
+}
 export default function AdminEmpresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +58,12 @@ export default function AdminEmpresas() {
     telefone: '',
     responsavel: '',
     ativa: true,
-    logo_url: ''
+    logo_url: '',
+    billing_enabled: false,
+    billing_plan: 'free',
+    billing_due_date: '',
+    billing_grace_days: '3',
+    billing_price: ''
   });
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -55,7 +79,7 @@ export default function AdminEmpresas() {
       setLoading(true);
       const { data, error } = await supabase
         .from('empresas')
-        .select('*')
+        .select('id,nome,telefone,responsavel,ativa,created_at,logo_url,billing_enabled,billing_plan,billing_due_date,billing_grace_days,billing_status,billing_price_cents,billing_currency')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -69,6 +93,13 @@ export default function AdminEmpresas() {
         ativa: empresa.ativa,
         criado_em: empresa.created_at,
         logo_url: empresa.logo_url || undefined,
+        billing_enabled: empresa.billing_enabled ?? false,
+        billing_plan: empresa.billing_plan ?? 'free',
+        billing_due_date: empresa.billing_due_date ?? null,
+        billing_grace_days: empresa.billing_grace_days ?? 3,
+        billing_status: empresa.billing_status ?? 'active',
+        billing_price_cents: empresa.billing_price_cents ?? null,
+        billing_currency: empresa.billing_currency ?? 'BRL',
       }));
       
       setEmpresas(mappedEmpresas);
@@ -113,6 +144,14 @@ export default function AdminEmpresas() {
 
       // Development fallback for mock mode
       if (import.meta.env.VITE_USE_MOCK === 'true') {
+        const plan = normalizePlan(formData.billing_plan);
+        const billable = planIsBillable(plan);
+        if (billable && formData.billing_enabled && !formData.billing_due_date) {
+          setFormError('Defina o vencimento para planos pagos (Basic/Pro).');
+          return;
+        }
+        const graceRawMock = Number(formData.billing_grace_days);
+        const graceMock = Number.isFinite(graceRawMock) && graceRawMock >= 0 ? graceRawMock : 3;
         const mockEmpresa: Empresa = {
           id: `mock-${Date.now()}`,
           nome: formData.nome.trim(),
@@ -121,11 +160,18 @@ export default function AdminEmpresas() {
           ativa: formData.ativa,
           criado_em: new Date().toISOString(),
           logo_url: formData.logo_url.trim() || undefined,
+          billing_enabled: billable ? Boolean(formData.billing_enabled) : false,
+          billing_plan: plan,
+          billing_due_date: billable && formData.billing_due_date ? formData.billing_due_date : null,
+          billing_grace_days: graceMock,
+          billing_status: 'active',
+          billing_price_cents: billable && formData.billing_price ? moneyToCents(formData.billing_price) : null,
+          billing_currency: 'BRL',
         };
 
         setEmpresas([mockEmpresa, ...empresas]);
         setModalOpen(false);
-        setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '' });
+        setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '', billing_enabled: false, billing_plan: 'free', billing_due_date: '', billing_grace_days: '3', billing_price: '' });
         setLogoPreview(null);
         setFormError('');
         
@@ -136,12 +182,27 @@ export default function AdminEmpresas() {
         return;
       }
 
+      const plan = normalizePlan(formData.billing_plan);
+      const billable = planIsBillable(plan);
+      if (billable && formData.billing_enabled && !formData.billing_due_date) {
+        setFormError('Defina o vencimento para planos pagos (Basic/Pro).');
+        setSubmitting(false);
+        return;
+      }
+      const graceRawCreate = Number(formData.billing_grace_days);
+      const graceCreate = Number.isFinite(graceRawCreate) && graceRawCreate >= 0 ? graceRawCreate : 3;
       const empresaData = {
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
         responsavel: formData.responsavel.trim() || null,
         ativa: formData.ativa,
         logo_url: formData.logo_url.trim() || null,
+        billing_enabled: billable ? Boolean(formData.billing_enabled) : false,
+        billing_plan: plan,
+        billing_due_date: billable && formData.billing_due_date ? formData.billing_due_date : null,
+        billing_grace_days: graceCreate,
+        billing_price_cents: billable && formData.billing_price ? moneyToCents(formData.billing_price) : null,
+        billing_currency: 'BRL',
       };
 
       const { data, error } = await supabase
@@ -169,11 +230,18 @@ export default function AdminEmpresas() {
         ativa: data.ativa,
         criado_em: data.created_at,
         logo_url: data.logo_url || undefined,
+        billing_enabled: data.billing_enabled ?? false,
+        billing_plan: data.billing_plan ?? 'free',
+        billing_due_date: data.billing_due_date ?? null,
+        billing_grace_days: data.billing_grace_days ?? 3,
+        billing_status: data.billing_status ?? 'active',
+        billing_price_cents: data.billing_price_cents ?? null,
+        billing_currency: data.billing_currency ?? 'BRL',
       };
 
       setEmpresas([newEmpresa, ...empresas]);
       setModalOpen(false);
-      setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '' });
+      setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '', billing_enabled: false, billing_plan: 'free', billing_due_date: '', billing_grace_days: '3', billing_price: '' });
       setLogoPreview(null);
       setFormError('');
       
@@ -210,12 +278,28 @@ export default function AdminEmpresas() {
       setSubmitting(true);
       setFormError('');
 
+      const plan = normalizePlan(formData.billing_plan);
+      const billable = planIsBillable(plan);
+      if (billable && formData.billing_enabled && !formData.billing_due_date) {
+        setFormError('Defina o vencimento para planos pagos (Basic/Pro).');
+        setSubmitting(false);
+        return;
+      }
+
+      const graceRawUpdate = Number(formData.billing_grace_days);
+      const graceUpdate = Number.isFinite(graceRawUpdate) && graceRawUpdate >= 0 ? graceRawUpdate : 3;
       const empresaData = {
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
         responsavel: formData.responsavel.trim() || null,
         ativa: formData.ativa,
         logo_url: formData.logo_url.trim() || null,
+        billing_enabled: billable ? Boolean(formData.billing_enabled) : false,
+        billing_plan: plan,
+        billing_due_date: billable && formData.billing_due_date ? formData.billing_due_date : null,
+        billing_grace_days: graceUpdate,
+        billing_price_cents: billable && formData.billing_price ? moneyToCents(formData.billing_price) : null,
+        billing_currency: 'BRL',
       };
 
       const { data, error } = await supabase
@@ -241,11 +325,18 @@ export default function AdminEmpresas() {
         ativa: data.ativa,
         criado_em: data.created_at,
         logo_url: data.logo_url || undefined,
+        billing_enabled: data.billing_enabled ?? false,
+        billing_plan: data.billing_plan ?? 'free',
+        billing_due_date: data.billing_due_date ?? null,
+        billing_grace_days: data.billing_grace_days ?? 3,
+        billing_status: data.billing_status ?? 'active',
+        billing_price_cents: data.billing_price_cents ?? null,
+        billing_currency: data.billing_currency ?? 'BRL',
       };
 
       setEmpresas(empresas.map(e => e.id === updatedEmpresa.id ? updatedEmpresa : e));
       setModalOpen(false);
-      setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '' });
+      setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '', billing_enabled: false, billing_plan: 'free', billing_due_date: '', billing_grace_days: '3', billing_price: '' });
       setLogoPreview(null);
       setFormError('');
       setEditingEmpresa(null);
@@ -275,7 +366,12 @@ export default function AdminEmpresas() {
       telefone: empresa.telefone,
       responsavel: empresa.responsavel,
       ativa: empresa.ativa,
-      logo_url: empresa.logo_url || ''
+      logo_url: empresa.logo_url || '',
+      billing_enabled: Boolean(empresa.billing_enabled),
+      billing_plan: normalizePlan(empresa.billing_plan),
+      billing_due_date: empresa.billing_due_date ? String(empresa.billing_due_date) : '',
+      billing_grace_days: String(empresa.billing_grace_days ?? 3),
+      billing_price: empresa.billing_price_cents != null ? centsToMoney(empresa.billing_price_cents) : '',
     });
     setLogoPreview(empresa.logo_url || null);
     setFormError('');
@@ -315,7 +411,7 @@ export default function AdminEmpresas() {
   };
 
   const resetForm = () => {
-    setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '' });
+    setFormData({ nome: '', telefone: '', responsavel: '', ativa: true, logo_url: '', billing_enabled: false, billing_plan: 'free', billing_due_date: '', billing_grace_days: '3', billing_price: '' });
     setFormError('');
     setEditingEmpresa(null);
     setLogoPreview(null);
@@ -514,6 +610,14 @@ export default function AdminEmpresas() {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0 space-y-3">
+                        {empresa.billing_enabled ? (
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>
+                              Plano: {planLabel(empresa.billing_plan)} ({planLimits(empresa.billing_plan).instances} inst / {planLimits(empresa.billing_plan).users} usuários)
+                            </span>
+                            <span>Venc: {empresa.billing_due_date ? String(empresa.billing_due_date) : '—'}</span>
+                          </div>
+                        ) : null}
                         <div className="grid gap-2 text-sm">
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <User className="h-4 w-4" />
@@ -654,6 +758,95 @@ export default function AdminEmpresas() {
                   disabled={submitting}
                 />
                 <Label>Empresa Ativa</Label>
+              </div>
+
+              <div className="border rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">Cobrança</div>
+                    <div className="text-xs text-muted-foreground">
+                      {planIsBillable(formData.billing_plan) ? 'Envia avisos e aplica bloqueio por vencimento.' : 'Free não recebe avisos e não é bloqueado.'}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={planIsBillable(formData.billing_plan) ? formData.billing_enabled : false}
+                    onCheckedChange={(checked) => setFormData({ ...formData, billing_enabled: checked })}
+                    disabled={submitting || !planIsBillable(formData.billing_plan)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Plano</Label>
+                    <Select
+                      value={formData.billing_plan}
+                      onValueChange={(v) => {
+                        const plan = normalizePlan(v);
+                        const billable = planIsBillable(plan);
+                        setFormData(prev => ({
+                          ...prev,
+                          billing_plan: plan,
+                          billing_enabled: billable ? prev.billing_enabled : false,
+                          billing_due_date: billable ? prev.billing_due_date : '',
+                        }));
+                      }}
+                      disabled={submitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="basic">Basic</SelectItem>
+                        <SelectItem value="pro">Pro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="text-xs text-muted-foreground">
+                      Limites: {planLimits(formData.billing_plan).instances} instância(s), {planLimits(formData.billing_plan).users} usuário(s).
+                    </div>
+                  </div>
+
+                  {planIsBillable(formData.billing_plan) && formData.billing_enabled ? (
+                    <div className="space-y-1">
+                      <Label>Vencimento</Label>
+                      <Input
+                        type="date"
+                        value={formData.billing_due_date}
+                        onChange={(e) => setFormData({ ...formData, billing_due_date: e.target.value })}
+                        disabled={submitting}
+                      />
+                    </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  {planIsBillable(formData.billing_plan) && formData.billing_enabled ? (
+                    <div className="space-y-1">
+                      <Label>Carência (dias)</Label>
+                      <Input
+                        type="number"
+                        value={formData.billing_grace_days}
+                        onChange={(e) => setFormData({ ...formData, billing_grace_days: e.target.value })}
+                        min={0}
+                        step={1}
+                        disabled={submitting}
+                      />
+                    </div>
+                  ) : null}
+
+                  {planIsBillable(formData.billing_plan) && formData.billing_enabled ? (
+                    <div className="space-y-1">
+                      <Label>Valor do plano (R$)</Label>
+                      <Input
+                        placeholder="Ex: 99,90"
+                        value={formData.billing_price}
+                        onChange={(e) => setFormData({ ...formData, billing_price: e.target.value })}
+                        disabled={submitting}
+                      />
+                      <div className="text-xs text-muted-foreground">Deixe em branco para usar valores acordados fora do sistema.</div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               
               <div className="flex justify-end gap-2">

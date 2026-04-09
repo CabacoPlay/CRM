@@ -15,6 +15,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { normalizePlan, planLabel, planLimits } from '@/lib/billing-plans';
 
 // Types for database integration
 interface Connection {
@@ -38,6 +39,7 @@ interface Empresa {
   telefone?: string;
   responsavel?: string;
   ativa: boolean;
+  billing_plan?: string | null;
   created_at?: string;
 }
 
@@ -90,7 +92,7 @@ export default function AdminConexoes() {
       // Load empresas
       const { data: empresasData, error: empresasError } = await supabase
         .from('empresas')
-        .select('*')
+        .select('id,nome,telefone,responsavel,ativa,created_at,billing_plan')
         .order('created_at', { ascending: false });
 
       if (empresasError) throw empresasError;
@@ -187,6 +189,18 @@ export default function AdminConexoes() {
         status: editingConexao ? editingConexao.status : 'desconectado',
         empresa_id: formData.empresa_id === 'global' ? null : formData.empresa_id || null,
       };
+
+      if (!editingConexao && conexaoData.empresa_id) {
+        const empresa = empresas.find(e => e.id === conexaoData.empresa_id) || null;
+        const plan = normalizePlan(empresa?.billing_plan);
+        const limits = planLimits(plan);
+        const countLocal = conexoes.filter(c => c.empresa_id === conexaoData.empresa_id).length;
+        if (countLocal >= limits.instances) {
+          setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.instances} instâncias).`);
+          setSubmitting(false);
+          return;
+        }
+      }
 
       if (editingConexao) {
         // Update existing connection

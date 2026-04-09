@@ -676,6 +676,14 @@ export type Database = {
       empresas: {
         Row: {
           ativa: boolean
+          billing_due_date: string | null
+          billing_enabled: boolean
+          billing_grace_days: number
+          billing_last_notified_at: string | null
+          billing_price_cents: number | null
+          billing_currency: string
+          billing_plan: string
+          billing_status: string
           created_at: string
           id: string
           logo_url: string | null
@@ -686,6 +694,14 @@ export type Database = {
         }
         Insert: {
           ativa?: boolean
+          billing_due_date?: string | null
+          billing_enabled?: boolean
+          billing_grace_days?: number
+          billing_last_notified_at?: string | null
+          billing_price_cents?: number | null
+          billing_currency?: string
+          billing_plan?: string
+          billing_status?: string
           created_at?: string
           id?: string
           logo_url?: string | null
@@ -696,6 +712,14 @@ export type Database = {
         }
         Update: {
           ativa?: boolean
+          billing_due_date?: string | null
+          billing_enabled?: boolean
+          billing_grace_days?: number
+          billing_last_notified_at?: string | null
+          billing_price_cents?: number | null
+          billing_currency?: string
+          billing_plan?: string
+          billing_status?: string
           created_at?: string
           id?: string
           logo_url?: string | null
@@ -860,6 +884,172 @@ export type Database = {
             columns: ["contato_id"]
             isOneToOne: false
             referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_events: {
+        Row: {
+          created_at: string
+          detail: string | null
+          empresa_id: string
+          id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          empresa_id: string
+          id?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          empresa_id?: string
+          id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_invoices: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          empresa_id: string
+          expires_at: string | null
+          id: string
+          paid_at: string | null
+          pix_copy_paste: string | null
+          pix_qr_image: string | null
+          provider: string
+          provider_location_id: number | null
+          provider_txid: string
+          raw: Json | null
+          status: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          empresa_id: string
+          expires_at?: string | null
+          id?: string
+          paid_at?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_image?: string | null
+          provider?: string
+          provider_location_id?: number | null
+          provider_txid: string
+          raw?: Json | null
+          status?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          empresa_id?: string
+          expires_at?: string | null
+          id?: string
+          paid_at?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_image?: string | null
+          provider?: string
+          provider_location_id?: number | null
+          provider_txid?: string
+          raw?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_settings: {
+        Row: {
+          access_token: string | null
+          env: string | null
+          id: string
+          updated_at: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          env?: string | null
+          id?: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          env?: string | null
+          id?: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
+      user_notifications: {
+        Row: {
+          created_at: string
+          description: string
+          empresa_id: string | null
+          id: string
+          meta: Json | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          empresa_id?: string | null
+          id?: string
+          meta?: Json | null
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          empresa_id?: string | null
+          id?: string
+          meta?: Json | null
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]

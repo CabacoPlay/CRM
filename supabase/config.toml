@@ -37,6 +37,21 @@ verify_jwt = false
 [functions.whatsapp-inbound]
 verify_jwt = false
 
+[functions.billing-cron]
+verify_jwt = false
+
+[functions.billing-ops]
+verify_jwt = false
+
+[functions.mp-settings]
+verify_jwt = false
+
+[functions.mp-pix-create]
+verify_jwt = false
+
+[functions.mp-webhook]
+verify_jwt = false
+
 [functions.whatsapp-send]
 verify_jwt = false
 

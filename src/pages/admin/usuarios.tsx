@@ -14,6 +14,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { planLimits, planLabel, normalizePlan } from '@/lib/billing-plans';
 
 // Types for database integration
 interface Usuario {
@@ -33,6 +34,7 @@ interface Empresa {
   telefone?: string;
   responsavel?: string;
   ativa: boolean;
+  billing_plan?: string | null;
   created_at?: string;
 }
 
@@ -75,7 +77,7 @@ export default function AdminUsuarios() {
       // Load empresas
       const { data: empresasData, error: empresasError } = await supabase
         .from('empresas')
-        .select('*')
+        .select('id,nome,telefone,responsavel,ativa,created_at,billing_plan')
         .order('created_at', { ascending: false });
 
       if (empresasError) throw empresasError;
@@ -151,6 +153,18 @@ export default function AdminUsuarios() {
       setSubmitting(true);
       setFormError('');
 
+      if (formData.papel === 'cliente' && formData.empresa_id) {
+        const empresa = empresas.find(e => e.id === formData.empresa_id) || null;
+        const plan = normalizePlan(empresa?.billing_plan);
+        const limits = planLimits(plan);
+        const countLocal = usuarios.filter(u => u.empresa_id === formData.empresa_id && u.papel === 'cliente').length;
+        if (countLocal >= limits.users) {
+          setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const usuarioData = {
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
@@ -223,11 +237,26 @@ export default function AdminUsuarios() {
       setSubmitting(true);
       setFormError('');
 
+      const nextEmpresaId = formData.papel === 'admin' ? null : formData.empresa_id || null;
+      const prevEmpresaId = editingUsuario.empresa_id || null;
+      const empresaChanged = nextEmpresaId !== prevEmpresaId;
+      if (formData.papel === 'cliente' && nextEmpresaId && (empresaChanged || editingUsuario.papel !== 'cliente')) {
+        const empresa = empresas.find(e => e.id === nextEmpresaId) || null;
+        const plan = normalizePlan(empresa?.billing_plan);
+        const limits = planLimits(plan);
+        const countLocal = usuarios.filter(u => u.empresa_id === nextEmpresaId && u.papel === 'cliente' && u.id !== editingUsuario.id).length;
+        if (countLocal >= limits.users) {
+          setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const usuarioData = {
         nome: formData.nome.trim(),
         telefone: formData.telefone.trim() || null,
         email: formData.email.trim(),
-        empresa_id: formData.papel === 'admin' ? null : formData.empresa_id || null,
+        empresa_id: nextEmpresaId,
         papel: formData.papel,
       };
 

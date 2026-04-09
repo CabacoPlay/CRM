@@ -36,6 +36,8 @@ const adminNavItems = [
   { label: 'Empresas', href: '/admin/empresas', icon: Building },
   { label: 'Usuários', href: '/admin/usuarios', icon: Users },
   { label: 'Conexões', href: '/admin/conexoes', icon: Plug },
+  { label: 'Planos & Faturas', href: '/admin/planos-faturas', icon: FileText },
+  { label: 'Pagamentos (Mercado Pago)', href: '/admin/pagamentos-config', icon: Settings },
   { label: 'Branding', href: '/admin/branding', icon: Palette },
 ];
 
