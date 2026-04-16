@@ -29,7 +29,7 @@ export function ConexoesContent({ showHeader = true }: { showHeader?: boolean })
   const [iaModalOpen, setIaModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [selectedIA, setSelectedIA] = useState('');
-  const [qrCodeData, setQrCodeData] = useState<any>(null);
+  const [qrCodeData, setQrCodeData] = useState<{ base64?: string; pairingCode?: string; code?: string } | null>(null);
   const [connectLoading, setConnectLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({});
   const [connectionStatuses, setConnectionStatuses] = useState<Record<string, string>>({});
@@ -217,26 +217,12 @@ export function ConexoesContent({ showHeader = true }: { showHeader?: boolean })
       const normalizedIA = !selectedIA || selectedIA === "none" ? null : selectedIA;
       const tipo = normalizedIA ? "cadastro" : "remoção";
 
-      // Send webhook with WhatsApp ID, IA ID (or null for unassignment), and tipo
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('whatsapp-webhook', {
-        body: {
-          whatsapp_id: selectedConnection.id,
-          ia_id: normalizedIA,
-          tipo: tipo
-        }
-      });
-      if (error) throw error;
-
-      // Update local state and database
       const updatedIAId = normalizedIA;
       
       // Update the connection in the database
       const { error: updateError } = await supabase
         .from('conexoes')
-        .update({ id_ia: updatedIAId } as any)
+        .update({ id_ia: updatedIAId })
         .eq('id', selectedConnection.id);
       
       if (updateError) throw updateError;
@@ -244,7 +230,7 @@ export function ConexoesContent({ showHeader = true }: { showHeader?: boolean })
       // Update local connections state
       setConnections(prev => prev.map(conn => 
         conn.id === selectedConnection.id 
-          ? { ...conn, id_ia: updatedIAId } as Connection
+          ? { ...conn, id_ia: updatedIAId }
           : conn
       ));
       
@@ -258,15 +244,31 @@ export function ConexoesContent({ showHeader = true }: { showHeader?: boolean })
         }
         return next;
       });
-      toast({
-        title: updatedIAId ? "IA Atribuída" : "IA Desatribuída",
-        description: updatedIAId ? `IA foi atribuída à conexão ${selectedConnection?.nome_api} e webhook enviado com sucesso.` : `IA foi desatribuída da conexão ${selectedConnection?.nome_api} e webhook enviado com sucesso.`
+
+      const { data } = await supabase.functions.invoke('whatsapp-webhook', {
+        body: { whatsapp_id: selectedConnection.id, ia_id: normalizedIA, tipo },
       });
+
+      const resp = (data as { ok?: boolean; success?: boolean; error?: string } | null) ?? null;
+      const ok = Boolean(resp?.ok) || Boolean(resp?.success);
+      if (!ok) {
+        const detail = String(resp?.error || '').trim();
+        toast({
+          title: updatedIAId ? "IA atribuída" : "IA desatribuída",
+          description: detail ? `Webhook não configurado: ${detail}` : 'Webhook não configurado. Verifique API URL/Key.',
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: updatedIAId ? "IA atribuída" : "IA desatribuída",
+          description: 'Webhook configurado com sucesso.',
+        });
+      }
     } catch (error) {
       console.error('Error sending webhook:', error);
       toast({
         title: "Erro",
-        description: "Falha ao enviar webhook.",
+        description: "Falha ao salvar configuração da IA.",
         variant: "destructive"
       });
     }

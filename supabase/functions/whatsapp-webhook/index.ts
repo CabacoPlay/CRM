@@ -1,4 +1,3 @@
-/// <reference path="../types.d.ts" />
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
@@ -8,8 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req: Request) => {
@@ -18,11 +17,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { whatsapp_id, ia_id, tipo } = await req.json();
+    const { whatsapp_id, ia_id, tipo } = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-    if (!whatsapp_id || !tipo) {
-      return new Response(JSON.stringify({ error: "whatsapp_id and tipo are required" }), {
-        status: 400,
+    const whatsappId = String(whatsapp_id || "").trim();
+    const tipoStr = String(tipo || "").trim();
+    if (!whatsappId || !tipoStr) {
+      return new Response(JSON.stringify({ ok: false, error: "whatsapp_id e tipo são obrigatórios" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -30,12 +30,11 @@ serve(async (req: Request) => {
     const { data: cx, error: cxError } = await supabase
       .from("conexoes")
       .select("id, api_url, nome_api, apikey, globalkey, empresa_id")
-      .eq("id", whatsapp_id)
+      .eq("id", whatsappId)
       .maybeSingle();
     if (cxError) throw cxError;
     if (!cx?.id || !cx.api_url || !cx.nome_api) {
-      return new Response(JSON.stringify({ error: "Conexão não encontrada ou incompleta" }), {
-        status: 404,
+      return new Response(JSON.stringify({ ok: false, error: "Conexão não encontrada ou incompleta" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -44,8 +43,7 @@ serve(async (req: Request) => {
     const instance = encodeURIComponent(String(cx.nome_api || ""));
     const apiKey = String(cx.apikey || cx.globalkey || "");
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "API Key da conexão não configurada" }), {
-        status: 400,
+      return new Response(JSON.stringify({ ok: false, error: "API Key da conexão não configurada" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -61,38 +59,58 @@ serve(async (req: Request) => {
       events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"],
     };
 
-    const evoResp = await fetch(`${baseUrl}/webhook/set/${instance}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify(evoBody),
-    });
+    const attempts: Array<{ url: string; status: number; body: string }> = [];
+    const headers = {
+      "Content-Type": "application/json",
+      apikey: apiKey,
+      Authorization: `Bearer ${apiKey}`,
+    };
 
-    const evoText = await evoResp.text().catch(() => "");
-    if (!evoResp.ok) {
-      return new Response(JSON.stringify({ error: "Falha ao configurar webhook na Evolution", status: evoResp.status, body: evoText }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const urls = [
+      `${baseUrl}/webhook/set/${instance}`,
+      `${baseUrl}/webhook/set/${instance}/`,
+      `${baseUrl}/${instance}/webhook/set`,
+      `${baseUrl}/${instance}/webhook/set/`,
+      `${baseUrl}/webhook/set`,
+      `${baseUrl}/webhook/set/`,
+    ];
+
+    for (const url of urls) {
+      const body = url.includes("/webhook/set/") && url.endsWith("/webhook/set")
+        ? JSON.stringify({ ...evoBody, instance: String(cx.nome_api || "") })
+        : JSON.stringify(evoBody);
+
+      const resp = await fetch(url, { method: "POST", headers, body });
+      const text = await resp.text().catch(() => "");
+      attempts.push({ url, status: resp.status, body: text });
+      if (resp.ok) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            message: "Webhook configurado com sucesso",
+            webhook_enabled: enabled,
+            webhook_url: webhookUrl,
+            response: text,
+            ia_id: ia_id ?? null,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (resp.status !== 404) break;
     }
 
     return new Response(
       JSON.stringify({
-        success: true,
-        message: "Webhook configurado com sucesso",
-        webhook_enabled: enabled,
+        ok: false,
+        error: "Falha ao configurar webhook na API",
         webhook_url: webhookUrl,
-        response: evoText,
-        ia_id: ia_id ?? null,
+        attempts,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
