@@ -57,6 +57,8 @@ export default function IAPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
   const [selectedIA, setSelectedIA] = useState<IA | null>(null);
+  const [delayMinSec, setDelayMinSec] = useState(1);
+  const [delayMaxSec, setDelayMaxSec] = useState(3);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [iaToDelete, setIAToDelete] = useState<IA | null>(null);
   const [faqToDelete, setFaqToDelete] = useState<FAQ | null>(null);
@@ -82,6 +84,13 @@ export default function IAPage() {
   const {
     toast
   } = useToast();
+  useEffect(() => {
+    if (!selectedIA) return;
+    const minMs = Number(selectedIA.response_delay_min_ms ?? 900);
+    const maxMs = Number(selectedIA.response_delay_max_ms ?? 2800);
+    setDelayMinSec(Math.max(0, Math.min(30, Math.round(minMs / 1000))));
+    setDelayMaxSec(Math.max(0, Math.min(30, Math.round(maxMs / 1000))));
+  }, [selectedIA?.id]);
   const fetchIAs = async () => {
     if (!user?.empresa_id) return;
     try {
@@ -160,7 +169,7 @@ export default function IAPage() {
       // Update database
       const { error: updateError } = await supabase
         .from('conexoes')
-        .update({ id_ia: iaIdForWebhook } as any)
+        .update({ id_ia: iaIdForWebhook })
         .eq('id', connection.id);
       
       if (updateError) throw updateError;
@@ -232,6 +241,8 @@ export default function IAPage() {
         whisper_ativo: formData.whisper_ativo,
         rag_ativo: formData.rag_ativo,
         openia_key: formData.openia_key.trim(),
+        response_delay_min_ms: 900,
+        response_delay_max_ms: 2800,
         empresa_id: user.empresa_id
       }]).select().single();
       if (error) throw error;
@@ -817,6 +828,55 @@ export default function IAPage() {
                       <Textarea value={selectedIA.msg_reativacao || ''} onChange={e => handleUpdateIA({
                     msg_reativacao: e.target.value
                   })} placeholder="Digite a mensagem que reativa a IA..." rows={3} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Label>Tempo de resposta (segundos)</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Define um atraso aleatório entre mínimo e máximo antes da IA responder no WhatsApp.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Mínimo</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={30}
+                            value={delayMinSec}
+                            onChange={(e) => setDelayMinSec(Number(e.target.value || 0))}
+                            onBlur={() => {
+                              const min = Math.max(0, Math.min(30, Math.floor(delayMinSec)));
+                              const max = Math.max(min, Math.min(30, Math.floor(delayMaxSec)));
+                              setDelayMinSec(min);
+                              setDelayMaxSec(max);
+                              handleUpdateIA({ response_delay_min_ms: min * 1000, response_delay_max_ms: max * 1000 });
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Máximo</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={30}
+                            value={delayMaxSec}
+                            onChange={(e) => setDelayMaxSec(Number(e.target.value || 0))}
+                            onBlur={() => {
+                              const min = Math.max(0, Math.min(30, Math.floor(delayMinSec)));
+                              const max = Math.max(min, Math.min(30, Math.floor(delayMaxSec)));
+                              setDelayMinSec(min);
+                              setDelayMaxSec(max);
+                              handleUpdateIA({ response_delay_min_ms: min * 1000, response_delay_max_ms: max * 1000 });
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch checked={selectedIA.ativa} onCheckedChange={checked => handleUpdateIA({

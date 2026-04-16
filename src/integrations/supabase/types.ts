@@ -1022,6 +1022,8 @@ export type Database = {
           personalidade: Database["public"]["Enums"]["ia_personalidade"]
           profile_img_url: string | null
           prompt: string
+          response_delay_max_ms: number
+          response_delay_min_ms: number
           sexo: string | null
           updated_at: string
         }
@@ -1036,6 +1038,8 @@ export type Database = {
           personalidade?: Database["public"]["Enums"]["ia_personalidade"]
           profile_img_url?: string | null
           prompt: string
+          response_delay_max_ms?: number
+          response_delay_min_ms?: number
           sexo?: string | null
           updated_at?: string
         }
@@ -1050,6 +1054,8 @@ export type Database = {
           personalidade?: Database["public"]["Enums"]["ia_personalidade"]
           profile_img_url?: string | null
           prompt?: string
+          response_delay_max_ms?: number
+          response_delay_min_ms?: number
           sexo?: string | null
           updated_at?: string
         }

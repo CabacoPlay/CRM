@@ -31,6 +31,8 @@ export interface IA {
   rag_ativo?: boolean;
   openia_key?: string;
   msg_reativacao?: string;
+  response_delay_min_ms?: number;
+  response_delay_max_ms?: number;
   empresa_id?: string;
   created_at?: string;
   updated_at?: string;

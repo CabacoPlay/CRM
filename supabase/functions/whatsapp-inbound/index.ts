@@ -178,9 +178,11 @@ function clampInt(value: number, min: number, max: number) {
   return v;
 }
 
-function computeResponseDelayMs(args: { text?: string; kind: "text" | "media" }) {
-  const minMs = clampInt(Number(Deno.env.get("RESPONSE_DELAY_MIN_MS") || "900"), 0, 30_000);
-  const maxMs = clampInt(Number(Deno.env.get("RESPONSE_DELAY_MAX_MS") || "2800"), 0, 30_000);
+function computeResponseDelayMs(args: { text?: string; kind: "text" | "media"; minMs?: number; maxMs?: number }) {
+  const minEnv = clampInt(Number(Deno.env.get("RESPONSE_DELAY_MIN_MS") || "900"), 0, 30_000);
+  const maxEnv = clampInt(Number(Deno.env.get("RESPONSE_DELAY_MAX_MS") || "2800"), 0, 30_000);
+  const minMs = clampInt(Number(args.minMs ?? minEnv), 0, 30_000);
+  const maxMs = clampInt(Number(args.maxMs ?? maxEnv), 0, 30_000);
   const min = Math.min(minMs, maxMs);
   const max = Math.max(minMs, maxMs);
   if (max === 0) return 0;
@@ -202,18 +204,20 @@ async function sleep(ms: number) {
 async function sendTextDelayed(
   conexao: { api_url?: string | null; nome_api?: string | null; apikey?: string | null; globalkey?: string | null },
   number: string,
-  text: string
+  text: string,
+  delay?: { minMs?: number; maxMs?: number }
 ) {
-  await sleep(computeResponseDelayMs({ kind: "text", text }));
+  await sleep(computeResponseDelayMs({ kind: "text", text, minMs: delay?.minMs, maxMs: delay?.maxMs }));
   return await sendText(conexao, number, text);
 }
 
 async function sendMediaDelayed(
   conexao: { api_url?: string | null; nome_api?: string | null; apikey?: string | null; globalkey?: string | null },
   number: string,
-  params: { mediatype: "image" | "video" | "document" | "audio" | "sticker"; media: string; caption?: string; mimetype?: string; fileName?: string }
+  params: { mediatype: "image" | "video" | "document" | "audio" | "sticker"; media: string; caption?: string; mimetype?: string; fileName?: string },
+  delay?: { minMs?: number; maxMs?: number }
 ) {
-  await sleep(computeResponseDelayMs({ kind: "media", text: params.caption || "" }));
+  await sleep(computeResponseDelayMs({ kind: "media", text: params.caption || "", minMs: delay?.minMs, maxMs: delay?.maxMs }));
   return await sendMedia(conexao, number, params);
 }
 
@@ -1822,13 +1826,14 @@ Deno.serve(async (req: Request) => {
           }
           const { data: ia } = await supabase
             .from("ias")
-            .select("id, ativa, prompt, openia_key, msg_reativacao, nome")
+            .select("id, ativa, prompt, openia_key, msg_reativacao, nome, response_delay_min_ms, response_delay_max_ms")
             .eq("id", iaId)
             .maybeSingle();
           if (!ia?.id || !ia.ativa || !ia.openia_key || !ia.prompt) {
             console.info(JSON.stringify({ ai_dispatch: "skipped", reason: "ia_inactive_or_missing_key", empresaId, contatoId, conexaoId, iaId }));
             continue;
           }
+          const delayCfg = { minMs: Number((ia as any).response_delay_min_ms ?? 900), maxMs: Number((ia as any).response_delay_max_ms ?? 2800) };
 
           const { data: history } = await supabase
             .from("mensagens")
@@ -1875,7 +1880,7 @@ Deno.serve(async (req: Request) => {
               const conexao = conexaoInfo || (await resolveConexaoForEmpresa(empresaId, conexaoId));
               if (conexao && number) {
                 const text = buildCatalogNotFoundFallback(term);
-                const sent = await sendTextDelayed(conexao, number, text);
+                  const sent = await sendTextDelayed(conexao, number, text, delayCfg);
                 await supabase.from("mensagens").insert({
                   empresa_id: empresaId,
                   contato_id: contatoId,
@@ -1896,7 +1901,7 @@ Deno.serve(async (req: Request) => {
             const number = normalizeNumber(rjid);
             const conexao = conexaoInfo || (await resolveConexaoForEmpresa(empresaId, conexaoId));
             if (!conexao || !number) continue;
-            const sent = await sendTextDelayed(conexao, number, aiText);
+            const sent = await sendTextDelayed(conexao, number, aiText, delayCfg);
             const ext = sent.ok ? extractExternalIdFromEvolutionResponse(sent.body) : null;
             await supabase.from("mensagens").insert({
               empresa_id: empresaId,
