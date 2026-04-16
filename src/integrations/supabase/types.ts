@@ -1210,6 +1210,27 @@ export type Database = {
         }
         Relationships: []
       }
+      resend_settings: {
+        Row: {
+          api_token: string | null
+          id: string
+          sender_title: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_token?: string | null
+          id?: string
+          sender_title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_token?: string | null
+          id?: string
+          sender_title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_notifications: {
         Row: {
           created_at: string

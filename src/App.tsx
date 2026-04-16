@@ -26,6 +26,8 @@ import AdminConexoes from "./pages/admin/conexoes";
 import AdminBranding from "./pages/admin/branding";
 import AdminPlanosFaturas from "./pages/admin/planos-faturas";
 import AdminPagamentosConfig from "./pages/admin/pagamentos-config";
+import AdminConfiguracoes from "./pages/admin/configuracoes";
+import AdminConfiguracoesResend from "./pages/admin/configuracoes-resend";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/auth";
 
@@ -135,6 +137,16 @@ const App = () => (
                 <Route path="/admin/pagamentos-config" element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminPagamentosConfig />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/configuracoes" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminConfiguracoes />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/configuracoes/resend" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminConfiguracoesResend />
                   </ProtectedRoute>
                 } />
                 <Route path="*" element={<NotFound />} />

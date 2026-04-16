@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   QrCode, 
@@ -37,8 +38,7 @@ const adminNavItems = [
   { label: 'Usuários', href: '/admin/usuarios', icon: Users },
   { label: 'Conexões', href: '/admin/conexoes', icon: Plug },
   { label: 'Planos & Faturas', href: '/admin/planos-faturas', icon: FileText },
-  { label: 'Pagamentos (Mercado Pago)', href: '/admin/pagamentos-config', icon: Settings },
-  { label: 'Branding', href: '/admin/branding', icon: Palette },
+  { label: 'Configurações', href: '/admin/configuracoes', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -47,6 +47,12 @@ export function Sidebar() {
   const location = useLocation();
   
   const navItems = user?.papel === 'admin' ? adminNavItems : clientNavItems;
+
+  useEffect(() => {
+    if (window.innerWidth < 1280) {
+      setSidebarCollapsed(true);
+    }
+  }, [location.pathname, setSidebarCollapsed]);
 
   return (
     <>
