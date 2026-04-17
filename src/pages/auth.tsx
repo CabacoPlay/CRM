@@ -75,7 +75,7 @@ export default function AuthPage() {
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <Bot className="w-6 h-6" />
               </div>
-              <span>AI CRM</span>
+              <span>F5 CRM</span>
             </div>
             <div className="mt-8 space-y-4">
               <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">
@@ -222,7 +222,7 @@ export default function AuthPage() {
                 )}
 
                 <p className="text-xs text-muted-foreground">
-                  Problemas com o acesso? <a href="#" className="underline">Contate o suporte</a>
+                  Problemas com o acesso? <a href="https://api.whatsapp.com/send/?phone=11910469931&text&type=phone_number&app_absent=0" className="underline">Contate o suporte</a>
                 </p>
               </div>
             </div>
