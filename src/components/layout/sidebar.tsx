@@ -4,6 +4,7 @@ import {
   QrCode, 
   Sparkles, 
   Package, 
+  Link2,
   Kanban,
   LayoutDashboard,
   MessageSquare,
@@ -28,6 +29,7 @@ const clientNavItems = [
   { label: 'Leads & CRM', href: '/app/crm', icon: Kanban },
   { label: 'Minha IA', href: '/app/ia', icon: Sparkles },
   { label: 'Catálogo', href: '/app/catalogo', icon: Package },
+  { label: 'Link Catálogo', href: '/app/catalogo-publico', icon: Link2 },
   { label: 'Orçamentos', href: '/app/orcamentos', icon: FileText },
   { label: 'Configurações', href: '/app/configuracoes', icon: Settings },
 ];

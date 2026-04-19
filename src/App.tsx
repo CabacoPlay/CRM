@@ -16,10 +16,12 @@ import AgendaPage from "./pages/app/agenda";
 import Conexoes from "./pages/app/conexoes";
 import IAPage from "./pages/app/ia";
 import Catalogo from "./pages/app/catalogo";
+import CatalogoPublicoFiltrosConfigPage from "./pages/app/catalogo-publico-filtros";
 import CRM from "./pages/app/crm";
 import ConfiguracoesPage from "./pages/app/configuracoes";
 import OrcamentosPage from "./pages/app/orcamentos";
 import PagamentoPage from "./pages/app/pagamento";
+import PublicCatalogPage from "./pages/public/catalogo";
 import AdminEmpresas from "./pages/admin/empresas";
 import AdminUsuarios from "./pages/admin/usuarios";
 import AdminConexoes from "./pages/admin/conexoes";
@@ -43,6 +45,7 @@ const App = () => (
           <AppProvider>
             <BrowserRouter>
               <Routes>
+                <Route path="/c/:slug" element={<PublicCatalogPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/" element={
                   <ProtectedRoute>
@@ -82,6 +85,11 @@ const App = () => (
                 <Route path="/app/catalogo" element={
                   <ProtectedRoute>
                     <Catalogo />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/catalogo-publico" element={
+                  <ProtectedRoute>
+                    <CatalogoPublicoFiltrosConfigPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/app/crm" element={

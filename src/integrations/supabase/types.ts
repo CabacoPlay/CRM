@@ -395,6 +395,130 @@ export type Database = {
           },
         ]
       }
+      catalog_item_attributes: {
+        Row: {
+          catalog_item_id: string
+          created_at: string
+          empresa_id: string
+          key: string
+          value: string
+        }
+        Insert: {
+          catalog_item_id: string
+          created_at?: string
+          empresa_id: string
+          key: string
+          value: string
+        }
+        Update: {
+          catalog_item_id?: string
+          created_at?: string
+          empresa_id?: string
+          key?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_item_attributes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_item_attributes_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_public_flow: {
+        Row: {
+          empresa_id: string
+          flow: Json
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          flow?: Json
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          flow?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_public_flow_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_public_settings: {
+        Row: {
+          avatar_url: string | null
+          background_color: string
+          card_color: string
+          cover_image_url: string | null
+          created_at: string
+          cta_template: string
+          enabled: boolean
+          empresa_id: string
+          headline: string | null
+          primary_color: string
+          slug: string
+          subheadline: string | null
+          updated_at: string
+          whatsapp_phone: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          background_color?: string
+          card_color?: string
+          cover_image_url?: string | null
+          created_at?: string
+          cta_template?: string
+          enabled?: boolean
+          empresa_id: string
+          headline?: string | null
+          primary_color?: string
+          slug: string
+          subheadline?: string | null
+          updated_at?: string
+          whatsapp_phone?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          background_color?: string
+          card_color?: string
+          cover_image_url?: string | null
+          created_at?: string
+          cta_template?: string
+          enabled?: boolean
+          empresa_id?: string
+          headline?: string | null
+          primary_color?: string
+          slug?: string
+          subheadline?: string | null
+          updated_at?: string
+          whatsapp_phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_public_settings_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias: {
         Row: {
           cor: string
