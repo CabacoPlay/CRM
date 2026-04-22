@@ -282,10 +282,11 @@ export default function ChatPage() {
   const [pendingText, setPendingText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [conversaTab, setConversaTab] = useState<'abertas' | 'resolvidas'>('abertas');
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [lastMessages, setLastMessages] = useState<Record<string, { conteudo: string; created_at: string }>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const prevSelectedContactIdRef = useRef<string | null>(null);
   const prevLoadingMessagesRef = useRef(false);
@@ -326,6 +327,35 @@ export default function ChatPage() {
     mq.addListener(handler);
     return () => mq.removeListener(handler);
   }, []);
+
+  const unreadStorageKey = useMemo(() => {
+    if (!empresaId) return '';
+    return `unread_counts_${empresaId}`;
+  }, [empresaId]);
+
+  useEffect(() => {
+    if (!unreadStorageKey) return;
+    try {
+      const raw = localStorage.getItem(unreadStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+      if (parsed && typeof parsed === 'object') {
+        setUnreadCounts(parsed as Record<string, number>);
+      } else {
+        setUnreadCounts({});
+      }
+    } catch {
+      setUnreadCounts({});
+    }
+  }, [unreadStorageKey]);
+
+  useEffect(() => {
+    if (!unreadStorageKey) return;
+    try {
+      localStorage.setItem(unreadStorageKey, JSON.stringify(unreadCounts || {}));
+    } catch {
+      // ignore
+    }
+  }, [unreadCounts, unreadStorageKey]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -1224,6 +1254,12 @@ export default function ChatPage() {
       setLoadingMessages(false);
     };
     loadMessages();
+    if (selectedContact?.id) {
+      setUnreadCounts((prev) => {
+        if (!prev[selectedContact.id]) return prev;
+        return { ...prev, [selectedContact.id]: 0 };
+      });
+    }
 
     if (!empresaId || !selectedContact?.id) return;
     const ch = sb
@@ -1275,12 +1311,32 @@ export default function ChatPage() {
         if (!m?.contato_id) return;
         const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
         setLastMessages(prev => ({ ...prev, [m.contato_id]: { conteudo: previewText, created_at: m.created_at } }));
+
+        if (m.direcao === 'in') {
+          const isViewing =
+            selectedContact?.id === m.contato_id &&
+            (!isMobile || mobilePane === 'chat') &&
+            document.visibilityState === 'visible';
+
+          if (!isViewing) {
+            setUnreadCounts((prev) => {
+              const cur = Number(prev[m.contato_id] || 0);
+              const next = Math.min(99, cur + 1);
+              return { ...prev, [m.contato_id]: next };
+            });
+          } else {
+            setUnreadCounts((prev) => {
+              if (!prev[m.contato_id]) return prev;
+              return { ...prev, [m.contato_id]: 0 };
+            });
+          }
+        }
       })
       .subscribe();
     return () => {
       sb.removeChannel(ch);
     };
-  }, [empresaId]);
+  }, [empresaId, selectedContact?.id, isMobile, mobilePane]);
 
   useEffect(() => {
     if (!scheduleOpen || scheduleView !== 'agendados') return;
@@ -1664,12 +1720,17 @@ export default function ChatPage() {
               <div className="p-4 text-sm text-muted-foreground">Nenhuma conversa</div>
             ) : visibleContacts.map((contact) => {
               const ets = contatoEtiquetasMap[contact.id] || [];
+              const unread = Number(unreadCounts[contact.id] || 0);
               return (
                 <div
                   key={contact.id}
                   onClick={() => {
                     setSelectedContact(contact);
                     setMsgStatus(contact.atendimento_mode === 'humano' ? 'Humano' : 'IA');
+                    setUnreadCounts((prev) => {
+                      if (!prev[contact.id]) return prev;
+                      return { ...prev, [contact.id]: 0 };
+                    });
                     if (isMobile) setMobilePane('chat');
                   }}
                   onContextMenu={(e) => openContactMenu(e, contact)}
@@ -1683,13 +1744,20 @@ export default function ChatPage() {
                     <AvatarFallback>{(contact.nome || 'C')[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
+                    <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{contact.nome}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {lastMessages[contact.id]?.created_at
-                          ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
-                          : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR')}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {unread > 0 ? (
+                          <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                            {unread}
+                          </span>
+                        ) : null}
+                        <span className="text-xs text-muted-foreground">
+                          {lastMessages[contact.id]?.created_at
+                            ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
+                            : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
                     </div>
                     {ets.length > 0 ? (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -1776,7 +1844,6 @@ export default function ChatPage() {
                     {msgStatus === 'IA' ? <Bot className="h-3 w-3 mr-1" /> : <User className="h-3 w-3 mr-1" />}
                     Atendimento {msgStatus}
                   </Badge>
-                  <span className="text-[10px] text-success">Online</span>
                 </div>
               </div>
             </div>
@@ -2234,14 +2301,14 @@ export default function ChatPage() {
                 </PopoverContent>
               </Popover>
               <div className="relative flex-1">
-                <Input
+                <Textarea
                   ref={inputRef}
                   value={pendingText}
                   onChange={(e) => {
                     setPendingText(e.target.value);
-                      if (selectedContact?.id && (selectedContact.atendimento_mode ?? 'ia') === 'ia') {
-                        setContactMode(selectedContact.id, 'humano');
-                      }
+                    if (selectedContact?.id && (selectedContact.atendimento_mode ?? 'ia') === 'ia') {
+                      setContactMode(selectedContact.id, 'humano');
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (slashQuickOpen) {
@@ -2265,7 +2332,7 @@ export default function ChatPage() {
                         });
                         return;
                       }
-                      if (e.key === 'Enter') {
+                      if (e.key === 'Enter' && !e.shiftKey) {
                         const picked = slashMatches[slashQuickIndex] || slashMatches[0];
                         if (picked) {
                           e.preventDefault();
@@ -2280,7 +2347,7 @@ export default function ChatPage() {
                     }
                   }}
                   placeholder={msgStatus === 'IA' ? "IA está respondendo... Digite para intervir" : "Digite sua mensagem..."}
-                  className="w-full"
+                  className="w-full min-h-[44px] max-h-40 resize-none"
                   disabled={!selectedContact}
                 />
                 {slashQuickOpen && (
