@@ -1744,8 +1744,8 @@ export default function ChatPage() {
                     <AvatarFallback>{(contact.nome || 'C')[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold truncate">{contact.nome}</p>
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 min-w-0 font-semibold truncate">{contact.nome}</p>
                       <div className="flex items-center gap-2 shrink-0">
                         {unread > 0 ? (
                           <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
@@ -2457,129 +2457,144 @@ export default function ChatPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Respostas Rápidas</DialogTitle>
-            <DialogDescription>Crie respostas prontas e use no chat com 1 clique.</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+          <div className="flex flex-col max-h-[85vh]">
+            <DialogHeader className="p-6 pb-3">
+              <DialogTitle>Respostas Rápidas</DialogTitle>
+              <DialogDescription>Crie respostas prontas e use no chat com 1 clique.</DialogDescription>
+            </DialogHeader>
 
-          <Tabs value={quickRepliesTab} onValueChange={(v) => setQuickRepliesTab(v === 'configurar' ? 'configurar' : 'usar')}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="usar">Usar</TabsTrigger>
-              <TabsTrigger value="configurar">Configurar</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="usar" className="space-y-3">
-              {quickRepliesLoading ? (
-                <div className="text-sm text-muted-foreground">Carregando...</div>
-              ) : quickReplies.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Nenhuma resposta rápida cadastrada.</div>
-              ) : (
-                <ScrollArea className="h-[340px] pr-2">
-                  <div className="space-y-2">
-                    {quickReplies.map((qr) => (
-                      <button
-                        key={qr.id}
-                        type="button"
-                        className="w-full rounded-lg border bg-card p-3 text-left hover:bg-accent transition-colors"
-                        onClick={() => applyQuickReply(qr)}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold truncate">{qr.titulo}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {qr.atalho ? `${qr.atalho} • ` : ''}{qr.mensagem}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" onClick={() => { setQuickRepliesTab('configurar'); }}>
-                  Configurar
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="configurar" className="space-y-4">
-              <div className="grid gap-2">
-                <Input
-                  value={quickReplyForm.titulo}
-                  onChange={(e) => setQuickReplyForm(prev => ({ ...prev, titulo: e.target.value }))}
-                  placeholder="Título (ex.: Saudação)"
-                />
-                <Input
-                  value={quickReplyForm.atalho}
-                  onChange={(e) => setQuickReplyForm(prev => ({ ...prev, atalho: e.target.value }))}
-                  placeholder="Atalho opcional (ex.: /ola)"
-                />
-                <Textarea
-                  value={quickReplyForm.mensagem}
-                  onChange={(e) => setQuickReplyForm(prev => ({ ...prev, mensagem: e.target.value }))}
-                  placeholder="Mensagem"
-                  rows={4}
-                />
-                <div className="flex items-center justify-end gap-2">
-                  {quickReplyEditingId ? (
-                    <>
-                      <Button variant="outline" onClick={resetQuickReplyForm}>Cancelar</Button>
-                      <Button onClick={saveQuickReply}>Salvar</Button>
-                    </>
-                  ) : (
-                    <Button onClick={saveQuickReply}>Adicionar</Button>
-                  )}
-                </div>
+            <Tabs
+              value={quickRepliesTab}
+              onValueChange={(v) => setQuickRepliesTab(v === 'configurar' ? 'configurar' : 'usar')}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <div className="px-6 pb-3 shrink-0">
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="usar" className="w-full">Usar</TabsTrigger>
+                  <TabsTrigger value="configurar" className="w-full">Configurar</TabsTrigger>
+                </TabsList>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-muted-foreground">Cadastradas</div>
-                {quickRepliesLoading ? (
-                  <div className="text-sm text-muted-foreground">Carregando...</div>
-                ) : quickReplies.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">Nenhuma resposta rápida cadastrada.</div>
-                ) : (
-                  <ScrollArea className="h-[220px] pr-2">
-                    <div className="space-y-2">
-                      {quickReplies.map((qr) => (
-                        <div key={qr.id} className="rounded-lg border bg-card p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold truncate">{qr.titulo}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {qr.atalho ? `${qr.atalho} • ` : ''}{qr.mensagem}
+              <div className="flex-1 min-h-0 px-6 pb-6">
+                <TabsContent value="usar" className="mt-0 h-full">
+                  <div className="h-full flex flex-col gap-3">
+                    {quickRepliesLoading ? (
+                      <div className="text-sm text-muted-foreground">Carregando...</div>
+                    ) : quickReplies.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">Nenhuma resposta rápida cadastrada.</div>
+                    ) : (
+                      <ScrollArea className="flex-1 pr-2">
+                        <div className="space-y-2">
+                          {quickReplies.map((qr) => (
+                            <button
+                              key={qr.id}
+                              type="button"
+                              className="w-full rounded-lg border bg-card p-3 text-left hover:bg-accent transition-colors"
+                              onClick={() => applyQuickReply(qr)}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold truncate">{qr.titulo}</div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {qr.atalho ? `${qr.atalho} • ` : ''}{qr.mensagem}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setQuickReplyEditingId(qr.id);
-                                  setQuickReplyForm({ titulo: qr.titulo || '', atalho: qr.atalho || '', mensagem: qr.mensagem || '' });
-                                }}
-                              >
-                                Editar
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => deleteQuickReply(qr.id)}
-                              >
-                                Remover
-                              </Button>
-                            </div>
-                          </div>
+                            </button>
+                          ))}
                         </div>
-                      ))}
+                      </ScrollArea>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 shrink-0">
+                      <Button variant="outline" onClick={() => { setQuickRepliesTab('configurar'); }}>
+                        Configurar
+                      </Button>
                     </div>
-                  </ScrollArea>
-                )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="configurar" className="mt-0 h-full">
+                  <div className="h-full flex flex-col gap-4">
+                    <div className="grid gap-2 shrink-0">
+                      <Input
+                        value={quickReplyForm.titulo}
+                        onChange={(e) => setQuickReplyForm(prev => ({ ...prev, titulo: e.target.value }))}
+                        placeholder="Título (ex.: Saudação)"
+                      />
+                      <Input
+                        value={quickReplyForm.atalho}
+                        onChange={(e) => setQuickReplyForm(prev => ({ ...prev, atalho: e.target.value }))}
+                        placeholder="Atalho opcional (ex.: /ola)"
+                      />
+                      <Textarea
+                        value={quickReplyForm.mensagem}
+                        onChange={(e) => setQuickReplyForm(prev => ({ ...prev, mensagem: e.target.value }))}
+                        placeholder="Mensagem"
+                        rows={4}
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        {quickReplyEditingId ? (
+                          <>
+                            <Button variant="outline" onClick={resetQuickReplyForm}>Cancelar</Button>
+                            <Button onClick={saveQuickReply}>Salvar</Button>
+                          </>
+                        ) : (
+                          <Button onClick={saveQuickReply}>Adicionar</Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 flex-1 min-h-0">
+                      <div className="text-xs font-semibold text-muted-foreground">Cadastradas</div>
+                      {quickRepliesLoading ? (
+                        <div className="text-sm text-muted-foreground">Carregando...</div>
+                      ) : quickReplies.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">Nenhuma resposta rápida cadastrada.</div>
+                      ) : (
+                        <ScrollArea className="h-full pr-2">
+                          <div className="space-y-2">
+                            {quickReplies.map((qr) => (
+                              <div key={qr.id} className="rounded-lg border bg-card p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold truncate">{qr.titulo}</div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {qr.atalho ? `${qr.atalho} • ` : ''}{qr.mensagem}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setQuickReplyEditingId(qr.id);
+                                        setQuickReplyForm({ titulo: qr.titulo || '', atalho: qr.atalho || '', mensagem: qr.mensagem || '' });
+                                      }}
+                                    >
+                                      Editar
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => deleteQuickReply(qr.id)}
+                                    >
+                                      Remover
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
               </div>
-            </TabsContent>
-          </Tabs>
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
 
