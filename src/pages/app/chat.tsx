@@ -1721,6 +1721,9 @@ export default function ChatPage() {
             ) : visibleContacts.map((contact) => {
               const ets = contatoEtiquetasMap[contact.id] || [];
               const unread = Number(unreadCounts[contact.id] || 0);
+              const displayDate = lastMessages[contact.id]?.created_at
+                ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
+                : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
               return (
                 <div
                   key={contact.id}
@@ -1744,20 +1747,9 @@ export default function ChatPage() {
                     <AvatarFallback>{(contact.nome || 'C')[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start justify-between gap-2">
                       <p className="flex-1 min-w-0 font-semibold truncate">{contact.nome}</p>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {unread > 0 ? (
-                          <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                            {unread}
-                          </span>
-                        ) : null}
-                        <span className="text-xs text-muted-foreground">
-                          {lastMessages[contact.id]?.created_at
-                            ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
-                            : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{displayDate}</span>
                     </div>
                     {ets.length > 0 ? (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -1781,11 +1773,16 @@ export default function ChatPage() {
                         ) : null}
                       </div>
                     ) : null}
-                    <p className="text-sm text-muted-foreground truncate">
-                      <span className="truncate">
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="flex-1 min-w-0 text-sm text-muted-foreground truncate">
                         {renderWhatsAppPreview(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato, `preview-${contact.id}`)}
-                      </span>
-                    </p>
+                      </p>
+                      {unread > 0 ? (
+                        <span className="shrink-0 min-w-[18px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                          {unread}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               );
