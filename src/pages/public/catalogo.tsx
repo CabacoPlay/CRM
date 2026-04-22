@@ -486,11 +486,11 @@ export default function PublicCatalogPage() {
                               background: 'rgba(255,255,255,0.06)',
                             }}
                           >
-                            <span className="min-w-0 text-left">
+                            <span className="flex-1 min-w-0 text-left">
                               <span className="block truncate font-semibold">{it.nome}</span>
                               <span className="block text-xs text-white/60 truncate">{it.descricao || ''}</span>
                             </span>
-                            <span className="text-xs text-white/80 ml-3">{formatBRL(it.valor)}</span>
+                            <span className="shrink-0 whitespace-nowrap text-xs text-white/80 ml-3">{formatBRL(it.valor)}</span>
                           </Button>
                         ))}
                       </div>
