@@ -434,6 +434,22 @@ export default function ChatPage() {
     return `${t.slice(0, Math.max(0, max - 1))}…`;
   };
 
+  const normalizeTimeHHMM = (value: string) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  };
+
+  const clampTimeHHMM = (value: string) => {
+    const m = String(value || '').match(/^(\d{1,2}):(\d{1,2})$/);
+    if (!m) return value;
+    const h = Number(m[1] || 0);
+    const mm = Number(m[2] || 0);
+    const hh2 = String(Math.min(23, Math.max(0, Number.isFinite(h) ? h : 0))).padStart(2, '0');
+    const mm2 = String(Math.min(59, Math.max(0, Number.isFinite(mm) ? mm : 0))).padStart(2, '0');
+    return `${hh2}:${mm2}`;
+  };
+
   const openSchedule = () => {
     setFilePickContext('schedule');
     setScheduleType('text');
@@ -1732,7 +1748,7 @@ export default function ChatPage() {
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
-              const previewShort = shortenLine(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '', 50);
+              const previewShort = shortenLine(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '', 40);
               return (
                 <div
                   key={contact.id}
@@ -2117,7 +2133,9 @@ export default function ChatPage() {
                     </div>
                     <div className="flex items-center gap-1 mt-1 px-1">
                       {msg.direcao === 'in' && <Bot className="h-3 w-3 text-primary" />}
-                      <span className="text-[10px] text-muted-foreground">{new Date(msg.created_at).toLocaleTimeString()}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                      </span>
                       {msg.status !== 'enviado' && <span className="text-[10px] text-muted-foreground">({msg.status})</span>}
                     </div>
                   </div>
@@ -2807,7 +2825,7 @@ export default function ChatPage() {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="justify-start gap-2">
                       <CalendarIcon className="h-4 w-4" />
-                      {scheduleDate ? scheduleDate.toLocaleDateString() : 'Selecionar data'}
+                      {scheduleDate ? scheduleDate.toLocaleDateString('pt-BR') : 'Selecionar data'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -2822,9 +2840,11 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2 border rounded-md px-3">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <input
-                    type="time"
                     value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
+                    onChange={(e) => setScheduleTime(normalizeTimeHHMM(e.target.value))}
+                    onBlur={() => setScheduleTime((v) => clampTimeHHMM(v))}
+                    inputMode="numeric"
+                    placeholder="HH:MM"
                     className="w-full bg-transparent outline-none text-sm py-2"
                   />
                 </div>
@@ -2849,7 +2869,15 @@ export default function ChatPage() {
                           {i.tipo === 'text' ? (i.texto || '(sem texto)') : `[${i.tipo}] ${i.file_name || ''}`.trim()}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(i.scheduled_for).toLocaleString()} • {i.status}
+                          {new Date(i.scheduled_for).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                          })}{' '}
+                          • {i.status}
                         </div>
                       </div>
                       <Button variant="destructive" size="sm" onClick={() => cancelScheduled(i.id)}>
