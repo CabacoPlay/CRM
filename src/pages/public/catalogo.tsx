@@ -459,7 +459,7 @@ export default function PublicCatalogPage() {
                             key={v}
                             onClick={() => pickValue(v)}
                             variant="outline"
-                            className="w-full rounded-2xl justify-between text-white h-auto py-3"
+                            className="w-full rounded-2xl justify-between text-white h-auto py-3 overflow-hidden"
                             style={{
                               borderColor: 'color-mix(in srgb, var(--catalog-primary) 18%, rgba(255,255,255,0.18))',
                               background: 'rgba(255,255,255,0.06)',
@@ -480,7 +480,7 @@ export default function PublicCatalogPage() {
                             key={it.id}
                             onClick={() => setSelectedItem(it)}
                             variant="outline"
-                            className="w-full rounded-2xl justify-between h-auto py-3 text-white"
+                            className="w-full rounded-2xl justify-between h-auto py-3 text-white overflow-hidden"
                             style={{
                               borderColor: 'rgba(255,255,255,0.18)',
                               background: 'rgba(255,255,255,0.06)',
