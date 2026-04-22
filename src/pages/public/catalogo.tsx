@@ -459,14 +459,14 @@ export default function PublicCatalogPage() {
                             key={v}
                             onClick={() => pickValue(v)}
                             variant="outline"
-                            className="w-full rounded-2xl justify-between text-white h-auto py-3 overflow-hidden"
+                            className="w-full min-w-0 rounded-2xl justify-between text-white h-auto py-3 overflow-hidden"
                             style={{
                               borderColor: 'color-mix(in srgb, var(--catalog-primary) 18%, rgba(255,255,255,0.18))',
                               background: 'rgba(255,255,255,0.06)',
                             }}
                           >
-                            <span className="truncate">{v}</span>
-                            <span className="text-xs opacity-60">›</span>
+                            <span className="flex-1 min-w-0 truncate text-left">{v}</span>
+                            <span className="shrink-0 text-xs opacity-60 ml-2">›</span>
                           </Button>
                         ))}
                       </div>
@@ -480,7 +480,7 @@ export default function PublicCatalogPage() {
                             key={it.id}
                             onClick={() => setSelectedItem(it)}
                             variant="outline"
-                            className="w-full rounded-2xl justify-between h-auto py-3 text-white overflow-hidden"
+                            className="w-full min-w-0 rounded-2xl justify-between h-auto py-3 text-white overflow-hidden"
                             style={{
                               borderColor: 'rgba(255,255,255,0.18)',
                               background: 'rgba(255,255,255,0.06)',

@@ -1687,7 +1687,7 @@ export default function ChatPage() {
         <div
           className={cn(
             "flex-col bg-card/50 md:border-r",
-            isMobile ? "w-full" : "w-[420px]",
+            isMobile ? "w-full" : "w-[480px]",
             isMobile && mobilePane === "chat" ? "hidden" : "flex",
           )}
         >
@@ -1732,7 +1732,7 @@ export default function ChatPage() {
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
-              const previewShort = shortenLine(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '', 72);
+              const previewShort = shortenLine(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '', 50);
               return (
                 <div
                   key={contact.id}
@@ -1758,7 +1758,7 @@ export default function ChatPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="flex-1 min-w-0 font-semibold truncate">{contact.nome}</p>
-                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{displayDate}</span>
+                      <span className="shrink-0 w-[64px] text-right text-xs text-muted-foreground tabular-nums">{displayDate}</span>
                     </div>
                     {ets.length > 0 ? (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -2376,7 +2376,7 @@ export default function ChatPage() {
                           <div className="flex items-center gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="font-semibold truncate">{qr.titulo}</div>
-                              <div className="text-xs text-muted-foreground truncate">{shortenLine(String(qr.mensagem || ''), 90)}</div>
+                              <div className="text-xs text-muted-foreground truncate">{shortenLine(String(qr.mensagem || ''), 50)}</div>
                             </div>
                             {qr.atalho ? (
                               <div className="text-xs text-muted-foreground shrink-0">{qr.atalho}</div>
@@ -2463,7 +2463,7 @@ export default function ChatPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-lg p-0">
           <div className="flex flex-col max-h-[85vh]">
             <DialogHeader className="p-6 pb-3">
               <DialogTitle>Respostas Rápidas</DialogTitle>
@@ -2476,9 +2476,9 @@ export default function ChatPage() {
               className="flex-1 flex flex-col min-h-0"
             >
               <div className="px-6 pb-3 shrink-0">
-                <TabsList className="w-full flex">
-                  <TabsTrigger value="usar" className="flex-1">Usar</TabsTrigger>
-                  <TabsTrigger value="configurar" className="flex-1">Configurar</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="usar" className="w-full min-w-0 px-2 text-xs sm:text-sm">Usar</TabsTrigger>
+                  <TabsTrigger value="configurar" className="w-full min-w-0 px-2 text-xs sm:text-sm">Configurar</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -2503,7 +2503,7 @@ export default function ChatPage() {
                                 <div className="flex-1 min-w-0">
                                   <div className="font-semibold truncate">{qr.titulo}</div>
                                   <div className="text-xs text-muted-foreground truncate">
-                                    {shortenLine(`${qr.atalho ? `${qr.atalho} • ` : ''}${qr.mensagem || ''}`, 110)}
+                                    {shortenLine(`${qr.atalho ? `${qr.atalho} • ` : ''}${qr.mensagem || ''}`, 50)}
                                   </div>
                                 </div>
                               </div>
@@ -2567,7 +2567,7 @@ export default function ChatPage() {
                                   <div className="flex-1 min-w-0">
                                     <div className="font-semibold truncate">{qr.titulo}</div>
                                     <div className="text-xs text-muted-foreground truncate">
-                                      {shortenLine(`${qr.atalho ? `${qr.atalho} • ` : ''}${qr.mensagem || ''}`, 110)}
+                                      {shortenLine(`${qr.atalho ? `${qr.atalho} • ` : ''}${qr.mensagem || ''}`, 50)}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
