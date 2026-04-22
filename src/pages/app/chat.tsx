@@ -1724,6 +1724,11 @@ export default function ChatPage() {
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
+              const previewRaw = lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '';
+              const previewText = String(previewRaw || '');
+              const previewSingleLine = previewText.replace(/\s+/g, ' ').trim();
+              const previewSafe = previewSingleLine.startsWith('sticker:') ? '[Figurinha]' : previewSingleLine;
+              const previewShort = previewSafe.length > 72 ? `${previewSafe.slice(0, 69)}…` : previewSafe;
               return (
                 <div
                   key={contact.id}
@@ -1775,7 +1780,7 @@ export default function ChatPage() {
                     ) : null}
                     <div className="mt-0.5 flex items-center justify-between gap-2">
                       <p className="flex-1 min-w-0 text-sm text-muted-foreground truncate">
-                        {renderWhatsAppPreview(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato, `preview-${contact.id}`)}
+                        {previewShort}
                       </p>
                       {unread > 0 ? (
                         <span className="shrink-0 min-w-[18px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
