@@ -1031,6 +1031,9 @@ function detectMessageType(msg: any) {
   if (msg?.buttonsResponseMessage) return "buttonsResponseMessage";
   if (msg?.templateButtonReplyMessage) return "templateButtonReplyMessage";
   if (msg?.listResponseMessage) return "listResponseMessage";
+  if (msg?.interactiveMessage) return "interactiveMessage";
+  if (msg?.templateMessage) return "templateMessage";
+  if (msg?.contactMessage) return "contactMessage";
   if (msg?.buttonsMessage) return "buttonsMessage";
   if (msg?.extendedTextMessage) return "extendedTextMessage";
   if (msg?.conversation) return "conversation";
@@ -1067,6 +1070,114 @@ function safeJsonParse(value: unknown) {
   } catch {
     return null;
   }
+}
+
+function stringifyObjectLines(obj: Record<string, unknown>) {
+  const formatValue = (v: unknown) => {
+    if (v === null || v === undefined) return "";
+    const t = typeof v;
+    if (t === "string") return String(v);
+    if (t === "number" || t === "boolean" || t === "bigint") return String(v);
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  };
+  const entries = Object.entries(obj)
+    .map(([k, v]) => `${k}: ${formatValue(v)}`.trim())
+    .filter(Boolean);
+  return entries.join("\n");
+}
+
+function amountToString(input: unknown, currency?: string) {
+  const obj = (input && typeof input === "object") ? (input as Record<string, unknown>) : null;
+  const valueRaw = obj?.value;
+  const offsetRaw = obj?.offset;
+  const value = typeof valueRaw === "number" ? valueRaw : Number(valueRaw);
+  const offset = typeof offsetRaw === "number" ? offsetRaw : Number(offsetRaw);
+  if (!Number.isFinite(value) || !Number.isFinite(offset)) return "";
+  const denom = Math.pow(10, Math.max(0, Math.min(6, Math.floor(offset))));
+  const num = value / denom;
+  const formatted = num.toFixed(Math.max(0, Math.min(6, Math.floor(offset))));
+  return currency ? `${currency} ${formatted}` : formatted;
+}
+
+function formatPixParams(parsed: Record<string, unknown>) {
+  const currency = typeof parsed.currency === "string" ? parsed.currency : undefined;
+  const referenceId = typeof parsed.referenceid === "string" ? parsed.referenceid : (typeof parsed.referenceId === "string" ? parsed.referenceId : undefined);
+  const totalAmount =
+    parsed.totalamount ??
+    parsed.totalAmount ??
+    (typeof parsed.order === "object" && parsed.order ? (parsed.order as Record<string, unknown>).totalamount : undefined);
+  const totalLabel = amountToString(totalAmount, currency);
+
+  const paymentSettings = parsed.paymentsettings ?? parsed.paymentSettings;
+  const list = Array.isArray(paymentSettings) ? paymentSettings : [];
+  let pix: Record<string, unknown> | null = null;
+  for (const it of list) {
+    const row = (it && typeof it === "object") ? (it as Record<string, unknown>) : null;
+    const type = String(row?.type || "").toLowerCase();
+    if (type === "pixstaticcode" && row?.pixstaticcode && typeof row.pixstaticcode === "object") {
+      pix = row.pixstaticcode as Record<string, unknown>;
+      break;
+    }
+  }
+  if (!pix && parsed.pixstaticcode && typeof parsed.pixstaticcode === "object") pix = parsed.pixstaticcode as Record<string, unknown>;
+  if (!pix) return "";
+
+  const key = typeof pix.key === "string" ? pix.key : "";
+  if (!key) return "";
+  const merchantName = typeof pix.merchantname === "string" ? pix.merchantname : (typeof pix.merchantName === "string" ? pix.merchantName : "");
+  const keyType = typeof pix.keytype === "string" ? pix.keytype : (typeof pix.keyType === "string" ? pix.keyType : "");
+
+  const lines: string[] = [];
+  lines.push("Copiar chave Pix");
+  lines.push(`Chave Pix: ${key}`);
+  if (merchantName) lines.push(`Recebedor: ${merchantName}`);
+  if (keyType) lines.push(`Tipo: ${keyType}`);
+  if (totalLabel) lines.push(`Valor: ${totalLabel}`);
+  if (referenceId) lines.push(`Referência: ${referenceId}`);
+  return lines.join("\n");
+}
+
+function extractNativeFlowButtonsText(nativeFlowMessage: any) {
+  const buttons = Array.isArray(nativeFlowMessage?.buttons) ? nativeFlowMessage.buttons : [];
+  const lines: string[] = [];
+  for (const b of buttons) {
+    const paramsJson = b?.buttonParamsJson;
+    if (!paramsJson) continue;
+    const parsed = safeJsonParse(paramsJson);
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const pix = formatPixParams(obj);
+      if (pix) {
+        lines.push(pix);
+        continue;
+      }
+      const label =
+        (obj.display_text as string | undefined) ||
+        (obj.text as string | undefined) ||
+        (obj.button_text as string | undefined) ||
+        "";
+      const copy =
+        (obj.copy_code as string | undefined) ||
+        (obj.code as string | undefined) ||
+        (obj.pix as string | undefined) ||
+        "";
+      const url = (obj.url as string | undefined) || "";
+      if (label) lines.push(String(label));
+      if (copy) lines.push(String(copy));
+      if (!label && !copy && url) lines.push(String(url));
+      if (!label && !copy && !url) {
+        const txt = stringifyObjectLines(obj);
+        if (txt) lines.push(txt);
+      }
+      continue;
+    }
+    lines.push(String(paramsJson));
+  }
+  return lines.join("\n").trim();
 }
 
 function extractTextContent(msg: any) {
@@ -1107,12 +1218,56 @@ function extractTextContent(msg: any) {
   if (interactiveResp?.nativeFlowResponseMessage?.paramsJson) {
     const parsed = safeJsonParse(interactiveResp.nativeFlowResponseMessage.paramsJson);
     if (parsed && typeof parsed === "object") {
-      const entries = Object.entries(parsed as Record<string, unknown>)
-        .map(([k, v]) => `${k}: ${String(v ?? "")}`.trim())
-        .filter(Boolean);
-      if (entries.length > 0) return entries.join("\n");
+      const obj = parsed as Record<string, unknown>;
+      const pix = formatPixParams(obj);
+      if (pix) return pix;
+      return stringifyObjectLines(obj);
     }
     return String(interactiveResp.nativeFlowResponseMessage.paramsJson);
+  }
+
+  const interactiveMsg = msg?.interactiveMessage || null;
+  if (interactiveMsg?.body?.text) return String(interactiveMsg.body.text);
+  if (interactiveMsg?.footer?.text) return String(interactiveMsg.footer.text);
+  if (interactiveMsg?.header?.title) return String(interactiveMsg.header.title);
+  if (interactiveMsg?.header?.text) return String(interactiveMsg.header.text);
+  if (interactiveMsg?.nativeFlowMessage) {
+    const nativeButtons = extractNativeFlowButtonsText(interactiveMsg.nativeFlowMessage);
+    if (nativeButtons) return nativeButtons;
+  }
+
+  const templateMsg = msg?.templateMessage || null;
+  const hydrated = templateMsg?.hydratedTemplate || templateMsg?.hydratedFourRowTemplate || null;
+  if (hydrated?.hydratedContentText) return String(hydrated.hydratedContentText);
+  if (hydrated?.hydratedFooterText) return String(hydrated.hydratedFooterText);
+  if (Array.isArray(hydrated?.hydratedButtons)) {
+    const lines: string[] = [];
+    for (const b of hydrated.hydratedButtons) {
+      const quick = b?.quickReplyButton;
+      const urlBtn = b?.urlButton;
+      const call = b?.callButton;
+      const copy = b?.copyButton;
+      if (quick?.displayText) lines.push(String(quick.displayText));
+      if (urlBtn?.displayText) lines.push(String(urlBtn.displayText));
+      if (urlBtn?.url) lines.push(String(urlBtn.url));
+      if (call?.displayText) lines.push(String(call.displayText));
+      if (call?.phoneNumber) lines.push(String(call.phoneNumber));
+      if (copy?.displayText) lines.push(String(copy.displayText));
+      if (copy?.copyCode) lines.push(String(copy.copyCode));
+    }
+    const joined = lines.filter(Boolean).join("\n").trim();
+    if (joined) return joined;
+  }
+
+  const contactMsg = msg?.contactMessage || null;
+  if (contactMsg?.displayName) return String(contactMsg.displayName);
+  const vcard = contactMsg?.vcard ? String(contactMsg.vcard) : "";
+  if (vcard) {
+    const name = vcard.match(/^FN:(.+)$/m)?.[1]?.trim() || "";
+    const tel = vcard.match(/^TEL[^:]*:(.+)$/m)?.[1]?.trim() || "";
+    const parts = [name, tel].filter(Boolean).join(" • ");
+    if (parts) return parts;
+    return vcard.slice(0, 2000);
   }
 
   const buttonsMsg = msg?.buttonsMessage || null;
@@ -1131,6 +1286,9 @@ function fallbackContentForType(msgType: string) {
   if (msgType === "buttonsResponseMessage" || msgType === "templateButtonReplyMessage" || msgType === "interactiveResponseMessage" || msgType === "listResponseMessage") {
     return "[Interação]";
   }
+  if (msgType === "interactiveMessage") return "[Interação]";
+  if (msgType === "templateMessage") return "[Template]";
+  if (msgType === "contactMessage") return "[Contato]";
   return "[Mensagem]";
 }
 
@@ -1517,17 +1675,20 @@ Deno.serve(async (req: Request) => {
     if (upsert && upsert.length > 0) {
       let processed = 0;
       for (const m of upsert) {
-        const key = m?.key || {};
-        const msg = m?.message || {};
+        const env = m?.data?.data || m?.data || m;
+        const key = env?.key || m?.key || {};
+        const msg = env?.message || m?.message || {};
         const msgInner = unwrapMessage(msg);
         const msgType = detectMessageType(msgInner);
         const extId = key?.id as string | undefined;
         const fromMe = Boolean(key?.fromMe);
-        const rjid = remoteJid || key?.remoteJid;
-        const pushName = m?.pushName;
+        const rjid = remoteJid || (env?.remoteJid as string | undefined) || (m?.remoteJid as string | undefined) || key?.remoteJid;
+        const pushNameRaw = (env?.pushName as string | undefined) || (m?.pushName as string | undefined);
+        const pushName = String(pushNameRaw || "").trim() || "Cliente";
         const contatoNome = deriveContatoNome({ rjid, fromMe, pushName, bodyNomeContato: nomeContato });
         let content =
           texto ||
+          (env?.texto as string | undefined) ||
           extractTextContent(msgInner) ||
           "";
         if (!content) content = fallbackContentForType(msgType);

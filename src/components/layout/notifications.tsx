@@ -196,8 +196,12 @@ export function SystemNotifications() {
   const showBrowserNotification = useCallback((title: string, description: string) => {
     try {
       if (typeof Notification === 'undefined') return;
+      const shouldNotify = document.visibilityState !== 'visible' || !document.hasFocus();
+      if (!shouldNotify) return;
+      if (Notification.permission === 'default') {
+        void Notification.requestPermission().catch(() => null);
+      }
       if (Notification.permission !== 'granted') return;
-      if (document.visibilityState === 'visible') return;
       new Notification(title, { body: description });
     } catch {
       return;
@@ -250,7 +254,7 @@ export function SystemNotifications() {
             read: false,
             type: 'message',
             meta: { contatoId: msg.contato_id }
-          }, true);
+          }, false);
         }
       )
       .on(

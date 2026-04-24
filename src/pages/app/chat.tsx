@@ -234,6 +234,12 @@ function renderWhatsAppText(text: string, keyPrefix: string) {
   return withBreaks;
 }
 
+function extractPixKey(text: string) {
+  const m = String(text || "").match(/(?:^|\n)\s*Chave Pix:\s*([^\n]+)\s*(?:\n|$)/i);
+  const key = (m?.[1] || "").trim();
+  return key || null;
+}
+
 function renderWhatsAppPreview(text: string, keyPrefix: string) {
   if ((text || '').startsWith('sticker:')) return '[Figurinha]';
   const singleLine = (text || '').replace(/\s+/g, ' ').trim();
@@ -1948,6 +1954,7 @@ export default function ChatPage() {
                 const bodyText = rendered.body || '';
                 const isAutoCaption = /^\[(Imagem|Vídeo|Documento|Áudio)\]/.test(bodyText.trim());
                 const captionText = isAutoCaption ? '' : bodyText;
+                const pixKey = extractPixKey(captionText || bodyText);
                 const mt = (msg.mimetype || '').toLowerCase();
                 const isImage = (msg.tipo === 'image' || mt.startsWith('image/')) && Boolean(msg.media_url);
                 const isVideo = (msg.tipo === 'video' || mt.startsWith('video/')) && Boolean(msg.media_url);
@@ -2105,6 +2112,25 @@ export default function ChatPage() {
                             <span className="whitespace-pre-wrap break-words">
                               {renderWhatsAppText(captionText || bodyText, `msg-${msg.id}`)}
                             </span>
+                            {pixKey ? (
+                              <div className="mt-2">
+                                <Button
+                                  variant="secondary"
+                                  className="h-8"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await navigator.clipboard.writeText(pixKey);
+                                      toast({ title: 'Copiado', description: 'Chave Pix copiada.' });
+                                    } catch {
+                                      toast({ title: 'Erro', description: 'Não foi possível copiar a chave Pix.', variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  Copiar chave Pix
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
                         )}
                       </div>
