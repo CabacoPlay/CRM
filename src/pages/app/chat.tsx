@@ -195,8 +195,32 @@ function renderWhatsAppText(text: string, keyPrefix: string) {
   nodes = applyMarker(nodes, /_([^_]+)_/g, (c, k) => <em key={k}>{c}</em>);
   nodes = applyMarker(nodes, /~([^~]+)~/g, (c, k) => <s key={k}>{c}</s>);
 
-  const withBreaks: React.ReactNode[] = [];
+  const withLinks: Array<string | React.ReactNode> = [];
+  const urlRegex = /\b((?:https?:\/\/|www\.)[^\s<]+)\b/gi;
   for (const n of nodes) {
+    if (typeof n !== 'string') {
+      withLinks.push(n);
+      continue;
+    }
+    let lastIndex = 0;
+    for (const match of n.matchAll(urlRegex)) {
+      const idx = match.index ?? -1;
+      const raw = match[1] ?? '';
+      if (idx < 0 || !raw) continue;
+      if (idx > lastIndex) withLinks.push(n.slice(lastIndex, idx));
+      const href = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
+      withLinks.push(
+        <a key={makeKey()} href={href} target="_blank" rel="noreferrer" className="underline break-all">
+          {raw}
+        </a>
+      );
+      lastIndex = idx + raw.length;
+    }
+    if (lastIndex < n.length) withLinks.push(n.slice(lastIndex));
+  }
+
+  const withBreaks: React.ReactNode[] = [];
+  for (const n of withLinks) {
     if (typeof n !== 'string') {
       withBreaks.push(n);
       continue;
@@ -1181,10 +1205,16 @@ export default function ChatPage() {
   }, [selectedContact, contactMenuOpen, replyTo, scheduleOpen, quickRepliesOpen, infoOpen, etiquetasOpen, forwardOpen, contactDeleteConfirmOpen, catalogOpen]);
 
   useEffect(() => {
-    if (!selectedContact?.id) return;
+    if (!selectedContact?.id) {
+      prevSelectedContactIdRef.current = null;
+      return;
+    }
     if (prevSelectedContactIdRef.current === selectedContact.id) return;
     prevSelectedContactIdRef.current = selectedContact.id;
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 0);
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      inputRef.current?.focus();
+    }, 0);
   }, [selectedContact?.id]);
 
   useEffect(() => {

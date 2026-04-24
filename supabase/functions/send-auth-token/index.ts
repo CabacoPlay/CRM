@@ -29,8 +29,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const generateToken = () => {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      const n = (buf[0] % 900) + 100;
+      return String(n);
+    };
+
     // Generate 3-digit token
-    const token = Math.floor(100 + Math.random() * 900).toString();
+    const token = generateToken();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Save token to database
@@ -93,6 +100,14 @@ Deno.serve(async (req: Request) => {
     const appUrl = String(Deno.env.get('APP_URL') || Deno.env.get('SITE_URL') || '').trim();
     const senderTitle = String(resendRow?.sender_title || 'Notificação do Sistema').trim();
     const subject = `${senderTitle} • Seu token de acesso`;
+    const text = [
+      senderTitle,
+      '',
+      `Seu token de acesso: ${token}`,
+      'Válido por 24 horas.',
+      appUrl ? '' : null,
+      appUrl ? `Acessar painel: ${appUrl}` : null,
+    ].filter((v) => typeof v === 'string' && v.length > 0).join('\n');
     const html = `
       <div style="margin:0;padding:0;background:#0b0f14;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0b0f14;padding:32px 12px;">
@@ -153,6 +168,7 @@ Deno.serve(async (req: Request) => {
         from,
         to: [email],
         subject,
+        text,
         html,
       }),
     });

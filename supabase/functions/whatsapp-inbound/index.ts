@@ -1027,6 +1027,11 @@ async function tryUpdateProfilePic(conexao: { api_url?: string | null; nome_api?
 
 function detectMessageType(msg: any) {
   if (msg?.reactionMessage) return "reactionMessage";
+  if (msg?.interactiveResponseMessage) return "interactiveResponseMessage";
+  if (msg?.buttonsResponseMessage) return "buttonsResponseMessage";
+  if (msg?.templateButtonReplyMessage) return "templateButtonReplyMessage";
+  if (msg?.listResponseMessage) return "listResponseMessage";
+  if (msg?.buttonsMessage) return "buttonsMessage";
   if (msg?.extendedTextMessage) return "extendedTextMessage";
   if (msg?.conversation) return "conversation";
   if (msg?.imageMessage) return "imageMessage";
@@ -1034,6 +1039,99 @@ function detectMessageType(msg: any) {
   if (msg?.videoMessage) return "videoMessage";
   if (msg?.documentMessage) return "documentMessage";
   return "unknown";
+}
+
+function unwrapMessage(input: any) {
+  let msg = input;
+  for (let i = 0; i < 8; i += 1) {
+    if (!msg || typeof msg !== "object") return msg;
+    const inner =
+      msg?.message ||
+      msg?.ephemeralMessage?.message ||
+      msg?.viewOnceMessage?.message ||
+      msg?.viewOnceMessageV2?.message ||
+      msg?.viewOnceMessageV2Extension?.message ||
+      msg?.documentWithCaptionMessage?.message ||
+      msg?.editedMessage?.message ||
+      msg?.protocolMessage?.editedMessage ||
+      null;
+    if (!inner || inner === msg) return msg;
+    msg = inner;
+  }
+  return msg;
+}
+
+function safeJsonParse(value: unknown) {
+  try {
+    return JSON.parse(String(value || "{}"));
+  } catch {
+    return null;
+  }
+}
+
+function extractTextContent(msg: any) {
+  const conversation = msg?.conversation as string | undefined;
+  if (conversation) return conversation;
+
+  const ext = msg?.extendedTextMessage || null;
+  if (ext?.text) return String(ext.text);
+  if (ext?.canonicalUrl) return String(ext.canonicalUrl);
+  if (ext?.matchedText) return String(ext.matchedText);
+
+  const imgCap = msg?.imageMessage?.caption;
+  if (imgCap) return String(imgCap);
+  const vidCap = msg?.videoMessage?.caption;
+  if (vidCap) return String(vidCap);
+  const docCap = msg?.documentMessage?.caption;
+  if (docCap) return String(docCap);
+
+  const buttonsResp = msg?.buttonsResponseMessage || null;
+  if (buttonsResp?.selectedDisplayText) return String(buttonsResp.selectedDisplayText);
+  if (buttonsResp?.selectedButtonId) return String(buttonsResp.selectedButtonId);
+
+  const templateBtn = msg?.templateButtonReplyMessage || null;
+  if (templateBtn?.selectedDisplayText) return String(templateBtn.selectedDisplayText);
+  if (templateBtn?.selectedId) return String(templateBtn.selectedId);
+
+  const listResp = msg?.listResponseMessage || null;
+  if (listResp?.title) return String(listResp.title);
+  if (listResp?.description) return String(listResp.description);
+  if (listResp?.singleSelectReply?.selectedRowId) return String(listResp.singleSelectReply.selectedRowId);
+
+  const interactiveResp = msg?.interactiveResponseMessage || null;
+  if (interactiveResp?.buttonReplyMessage?.selectedDisplayText) return String(interactiveResp.buttonReplyMessage.selectedDisplayText);
+  if (interactiveResp?.buttonReplyMessage?.selectedButtonId) return String(interactiveResp.buttonReplyMessage.selectedButtonId);
+  if (interactiveResp?.listReplyMessage?.title) return String(interactiveResp.listReplyMessage.title);
+  if (interactiveResp?.listReplyMessage?.description) return String(interactiveResp.listReplyMessage.description);
+  if (interactiveResp?.nativeFlowResponseMessage?.name) return String(interactiveResp.nativeFlowResponseMessage.name);
+  if (interactiveResp?.nativeFlowResponseMessage?.paramsJson) {
+    const parsed = safeJsonParse(interactiveResp.nativeFlowResponseMessage.paramsJson);
+    if (parsed && typeof parsed === "object") {
+      const entries = Object.entries(parsed as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${String(v ?? "")}`.trim())
+        .filter(Boolean);
+      if (entries.length > 0) return entries.join("\n");
+    }
+    return String(interactiveResp.nativeFlowResponseMessage.paramsJson);
+  }
+
+  const buttonsMsg = msg?.buttonsMessage || null;
+  if (buttonsMsg?.contentText) return String(buttonsMsg.contentText);
+  if (buttonsMsg?.footerText) return String(buttonsMsg.footerText);
+
+  return "";
+}
+
+function fallbackContentForType(msgType: string) {
+  if (msgType === "audioMessage") return "[Áudio]";
+  if (msgType === "imageMessage") return "[Imagem]";
+  if (msgType === "videoMessage") return "[Vídeo]";
+  if (msgType === "documentMessage") return "[Documento]";
+  if (msgType === "buttonsMessage") return "[Botões]";
+  if (msgType === "buttonsResponseMessage" || msgType === "templateButtonReplyMessage" || msgType === "interactiveResponseMessage" || msgType === "listResponseMessage") {
+    return "[Interação]";
+  }
+  return "[Mensagem]";
 }
 
 async function markAiDispatched(empresaId: string, contatoId: string, externalId: string | null, conteudo: string) {
@@ -1421,25 +1519,18 @@ Deno.serve(async (req: Request) => {
       for (const m of upsert) {
         const key = m?.key || {};
         const msg = m?.message || {};
-        const msgInner = msg?.ephemeralMessage?.message || msg;
+        const msgInner = unwrapMessage(msg);
         const msgType = detectMessageType(msgInner);
         const extId = key?.id as string | undefined;
         const fromMe = Boolean(key?.fromMe);
         const rjid = remoteJid || key?.remoteJid;
         const pushName = m?.pushName;
         const contatoNome = deriveContatoNome({ rjid, fromMe, pushName, bodyNomeContato: nomeContato });
-        const content =
+        let content =
           texto ||
-          msgInner?.conversation ||
-          msgInner?.extendedTextMessage?.text ||
-          msgInner?.imageMessage?.caption ||
-          msgInner?.videoMessage?.caption ||
-          msgInner?.documentMessage?.caption ||
-          (msgType === "audioMessage" ? "[Áudio]" : "") ||
-          (msgType === "imageMessage" ? "[Imagem]" : "") ||
-          (msgType === "videoMessage" ? "[Vídeo]" : "") ||
-          (msgType === "documentMessage" ? "[Documento]" : "") ||
+          extractTextContent(msgInner) ||
           "";
+        if (!content) content = fallbackContentForType(msgType);
         if (!rjid) continue;
         let empresaId = (body?.empresa_id as string | undefined) || undefined;
         let conexaoId: string | null = null;
@@ -1539,8 +1630,6 @@ Deno.serve(async (req: Request) => {
           processed += 1;
           continue;
         }
-
-        if (!content) continue;
         if (conexaoInfo && !fromMe) {
           const last = profileFetchedAt ? Date.parse(String(profileFetchedAt)) : 0;
           const stale = !last || Number.isNaN(last) ? true : Date.now() - last > 24 * 60 * 60_000;
