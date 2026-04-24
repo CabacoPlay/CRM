@@ -101,7 +101,7 @@ function DraggableContact({ contato, onOpenContato }: { contato: Contato; onOpen
             </div>
 
             {contato.resumo && (
-              <div className="text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-lg leading-relaxed break-words border border-border/50 whitespace-pre-wrap">
+              <div className="w-full min-w-0 overflow-hidden text-[11px] text-muted-foreground bg-muted/40 p-2.5 rounded-lg leading-relaxed border border-border/50 whitespace-pre-wrap break-all">
                 {contato.resumo}
               </div>
             )}
