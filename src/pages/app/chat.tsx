@@ -1004,7 +1004,7 @@ export default function ChatPage() {
       body === '[Documento]' ||
       (mt && !mt.startsWith('image/') && !mt.startsWith('video/') && !mt.startsWith('audio/') && Boolean(last?.media_url));
 
-    const text = shortenLine(body.replace(/\s+/g, ' ').trim(), 60);
+    const text = shortenLine(body.replace(/\s+/g, ' ').trim(), 50);
 
     if (isAudio) {
       return { kind: 'audio' as const, icon: <Mic className="h-4 w-4 shrink-0 opacity-80" />, label: 'Áudio', detail: '', mediaUrl: mediaUrl || null };
@@ -1023,7 +1023,7 @@ export default function ChatPage() {
     if (isSticker) {
       return { kind: 'sticker' as const, icon: <ImageIcon className="h-4 w-4 shrink-0 opacity-80" />, label: 'Figurinha', detail: '', mediaUrl: null };
     }
-    return { kind: 'text' as const, icon: null as React.ReactNode, label: '', detail: shortenLine(raw.replace(/\s+/g, ' ').trim(), 60), mediaUrl: null };
+    return { kind: 'text' as const, icon: null as React.ReactNode, label: '', detail: shortenLine(raw.replace(/\s+/g, ' ').trim(), 50), mediaUrl: null };
   };
 
   const formatDuration = (durationSeconds: number) => {
@@ -2066,10 +2066,10 @@ export default function ChatPage() {
                             <>
                               {preview.icon}
                               <span className="shrink-0 font-medium">{preview.label}</span>
-                              {preview.detail ? <span className="truncate opacity-80">{preview.detail}</span> : null}
+                              {preview.detail ? <span className="min-w-0 flex-1 truncate opacity-80">{preview.detail}</span> : null}
                             </>
                           ) : (
-                            <span className="truncate">{preview.detail}</span>
+                            <span className="min-w-0 flex-1 truncate">{preview.detail}</span>
                           )}
                         </div>
                       </div>
