@@ -318,6 +318,12 @@ export default function ChatPage() {
   const [lastMessages, setLastMessages] = useState<Record<string, { conteudo: string; created_at: string; tipo?: Mensagem['tipo'] | null; mimetype?: string | null; file_name?: string | null; media_url?: string | null }>>({});
   const [mediaDurations, setMediaDurations] = useState<Record<string, number>>({});
   const durationInflightRef = useRef<Set<string>>(new Set());
+  const [dragActive, setDragActive] = useState(false);
+  const dragDepthRef = useRef(0);
+  const [pasteConfirmOpen, setPasteConfirmOpen] = useState(false);
+  const [pasteFiles, setPasteFiles] = useState<File[]>([]);
+  const [pastePreviewUrl, setPastePreviewUrl] = useState<string | null>(null);
+  const [pastePreviewKind, setPastePreviewKind] = useState<'image' | 'video' | 'audio' | 'file' | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const prevSelectedContactIdRef = useRef<string | null>(null);
@@ -1028,6 +1034,61 @@ export default function ChatPage() {
     const ss = total % 60;
     return `${mm}:${String(ss).padStart(2, '0')}`;
   };
+
+  const formatFileSize = (bytes: number) => {
+    const b = Number(bytes);
+    if (!Number.isFinite(b) || b <= 0) return '';
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(b / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  };
+
+  const inferImmediatePickType = (file: File): 'image' | 'document' | 'audio' => {
+    const mt = String(file?.type || '').toLowerCase();
+    if (mt.startsWith('audio/')) return 'audio';
+    if (mt.startsWith('image/') || mt.startsWith('video/')) return 'image';
+    return 'document';
+  };
+
+  const inferPreviewKind = (file: File): 'image' | 'video' | 'audio' | 'file' => {
+    const mt = String(file?.type || '').toLowerCase();
+    if (mt.startsWith('image/')) return 'image';
+    if (mt.startsWith('video/')) return 'video';
+    if (mt.startsWith('audio/')) return 'audio';
+    return 'file';
+  };
+
+  const sendFilesImmediate = async (files: File[]) => {
+    if (!selectedContact?.id) {
+      toast({ title: 'Selecione uma conversa', description: 'Abra uma conversa para enviar arquivo.', variant: 'destructive' });
+      return;
+    }
+    if (!files.length) return;
+    for (const f of files) {
+      await sendImmediateMedia(f, inferImmediatePickType(f));
+    }
+  };
+
+  useEffect(() => {
+    if (!pasteConfirmOpen || pasteFiles.length === 0) {
+      if (pastePreviewUrl) URL.revokeObjectURL(pastePreviewUrl);
+      setPastePreviewUrl(null);
+      setPastePreviewKind(null);
+      return;
+    }
+    const file = pasteFiles[0];
+    const kind = inferPreviewKind(file);
+    setPastePreviewKind(kind);
+    const url = URL.createObjectURL(file);
+    setPastePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [pasteConfirmOpen, pasteFiles]);
 
   const isAudioMessage = (msg: Mensagem) => {
     const mt = (msg.mimetype || '').toLowerCase();
@@ -2028,10 +2089,47 @@ export default function ChatPage() {
         {/* Chat Area */}
         <div
           className={cn(
-            "flex-1 flex-col bg-accent/5 min-w-0",
+            "flex-1 flex-col bg-accent/5 min-w-0 relative",
             isMobile && mobilePane === "list" ? "hidden" : "flex",
           )}
+          onDragEnter={(e) => {
+            if (!selectedContact?.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dragDepthRef.current += 1;
+            setDragActive(true);
+          }}
+          onDragOver={(e) => {
+            if (!selectedContact?.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(e) => {
+            if (!selectedContact?.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+            if (dragDepthRef.current === 0) setDragActive(false);
+          }}
+          onDrop={(e) => {
+            if (!selectedContact?.id) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dragDepthRef.current = 0;
+            setDragActive(false);
+            const files = Array.from(e.dataTransfer?.files || []);
+            void sendFilesImmediate(files);
+          }}
         >
+          {selectedContact?.id && dragActive ? (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+              <div className="rounded-xl border border-dashed bg-card/80 px-6 py-5 text-center shadow-sm">
+                <div className="text-sm font-semibold">Solte para enviar</div>
+                <div className="text-xs text-muted-foreground mt-1">Imagens, vídeos, áudios e arquivos</div>
+              </div>
+            </div>
+          ) : null}
           {!selectedContact && (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center opacity-80">
@@ -2564,6 +2662,18 @@ export default function ChatPage() {
                       setContactMode(selectedContact.id, 'humano');
                     }
                   }}
+                  onPaste={(e) => {
+                    if (!selectedContact?.id) return;
+                    const items = Array.from(e.clipboardData?.items || []);
+                    const files = items
+                      .filter((it) => it.kind === 'file')
+                      .map((it) => it.getAsFile())
+                      .filter((f): f is File => Boolean(f));
+                    if (files.length === 0) return;
+                    e.preventDefault();
+                    setPasteFiles(files);
+                    setPasteConfirmOpen(true);
+                  }}
                   onKeyDown={(e) => {
                     if (slashQuickOpen) {
                       if (e.key === 'Escape') {
@@ -2696,6 +2806,73 @@ export default function ChatPage() {
             </Button>
             <Button onClick={forwardSend} disabled={!forwardMsg || forwardContactId === 'none'}>
               Encaminhar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pasteConfirmOpen}
+        onOpenChange={(o) => {
+          setPasteConfirmOpen(o);
+          if (!o) setPasteFiles([]);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enviar arquivo colado?</DialogTitle>
+            <DialogDescription>Confira antes de enviar.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {pastePreviewUrl && pastePreviewKind === 'image' ? (
+              <div className="rounded-lg border bg-muted/30 p-2">
+                <img src={pastePreviewUrl} className="w-full h-auto rounded-md max-h-[320px] object-contain" alt="Pré-visualização" />
+              </div>
+            ) : pastePreviewUrl && pastePreviewKind === 'video' ? (
+              <div className="rounded-lg border bg-muted/30 p-2">
+                <video src={pastePreviewUrl} controls className="w-full rounded-md max-h-[320px]" />
+              </div>
+            ) : pastePreviewUrl && pastePreviewKind === 'audio' ? (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <audio src={pastePreviewUrl} controls className="w-full" />
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {pasteFiles.length > 0 ? 'Arquivo pronto para envio.' : 'Nenhum arquivo selecionado.'}
+              </div>
+            )}
+
+            {pasteFiles.length > 0 ? (
+              <div className="rounded-lg border bg-card p-3 text-sm">
+                <div className="font-semibold truncate">{pasteFiles[0].name || 'arquivo'}</div>
+                <div className="text-xs text-muted-foreground">
+                  {pasteFiles[0].type ? pasteFiles[0].type : 'application/octet-stream'}
+                  {pasteFiles[0].size ? ` • ${formatFileSize(pasteFiles[0].size)}` : ''}
+                  {pasteFiles.length > 1 ? ` • +${pasteFiles.length - 1} arquivo(s)` : ''}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPasteConfirmOpen(false);
+                setPasteFiles([]);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const files = pasteFiles;
+                setPasteConfirmOpen(false);
+                setPasteFiles([]);
+                void sendFilesImmediate(files);
+              }}
+              disabled={!selectedContact?.id || pasteFiles.length === 0}
+            >
+              Enviar
             </Button>
           </div>
         </DialogContent>
