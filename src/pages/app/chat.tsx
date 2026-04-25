@@ -30,6 +30,7 @@ import {
   CalendarDays,
   ListChecks,
   Clock,
+  Download,
   X
 } from 'lucide-react';
 import { cn, getBrandLogoUrl, resolveTheme } from '@/lib/utils';
@@ -1123,6 +1124,69 @@ export default function ChatPage() {
     const quote = src.slice(marker.length, sep).trim();
     const body = src.slice(sep + 2).trimStart();
     return { quote: quote || null, body };
+  };
+
+  const downloadMessageMedia = async (msg: Mensagem) => {
+    const url = String(msg.media_url || '').trim();
+    if (!url) return;
+
+    const pickName = () => {
+      const fromDb = String(msg.file_name || '').trim();
+      if (fromDb) return fromDb;
+      const mt = String(msg.mimetype || '').toLowerCase();
+      const cleanUrl = url.split('#')[0]?.split('?')[0] || url;
+      const urlName = cleanUrl.split('/').pop() || '';
+      if (urlName.includes('.') && urlName.length <= 120) return urlName;
+
+      const ext =
+        mt === 'image/webp'
+          ? 'webp'
+          : mt === 'image/png'
+            ? 'png'
+            : mt === 'image/gif'
+              ? 'gif'
+              : mt === 'image/jpeg' || mt === 'image/jpg'
+                ? 'jpg'
+                : mt === 'video/mp4'
+                  ? 'mp4'
+                  : mt.startsWith('audio/')
+                    ? mt.split('/')[1] || 'audio'
+                    : mt === 'application/pdf'
+                      ? 'pdf'
+                      : mt.includes('word')
+                        ? 'docx'
+                        : mt.includes('excel') || mt.includes('spreadsheet')
+                          ? 'xlsx'
+                          : mt.includes('zip')
+                            ? 'zip'
+                            : '';
+
+      const base = String(msg.tipo || 'arquivo');
+      const suffix = String(msg.id || '').slice(0, 8) || 'media';
+      return ext ? `${base}-${suffix}.${ext}` : `${base}-${suffix}`;
+    };
+
+    const filename = pickName();
+
+    try {
+      const res = await fetch(url).catch(() => null);
+      if (!res || !res.ok) throw new Error('download_failed');
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 2000);
+    } catch {
+      try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch {
+        toast({ title: 'Erro', description: 'Não foi possível baixar o arquivo.', variant: 'destructive' });
+      }
+    }
   };
 
   const copyMessageText = async (msg: Mensagem) => {
@@ -2448,6 +2512,12 @@ export default function ChatPage() {
                               <Forward className="h-4 w-4 mr-2" />
                               Encaminhar
                             </DropdownMenuItem>
+                            {msg.media_url ? (
+                              <DropdownMenuItem onClick={() => void downloadMessageMedia(msg)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Baixar mídia
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuItem onClick={() => copyMessageText(msg)}>
                               <CopyIcon className="h-4 w-4 mr-2" />
                               Copiar
