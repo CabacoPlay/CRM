@@ -315,7 +315,9 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [lastMessages, setLastMessages] = useState<Record<string, { conteudo: string; created_at: string }>>({});
+  const [lastMessages, setLastMessages] = useState<Record<string, { conteudo: string; created_at: string; tipo?: Mensagem['tipo'] | null; mimetype?: string | null; file_name?: string | null; media_url?: string | null }>>({});
+  const [mediaDurations, setMediaDurations] = useState<Record<string, number>>({});
+  const durationInflightRef = useRef<Set<string>>(new Set());
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const prevSelectedContactIdRef = useRef<string | null>(null);
@@ -969,10 +971,62 @@ export default function ChatPage() {
   const getMessageSnippet = (msg: Mensagem) => {
     const mt = (msg.mimetype || '').toLowerCase();
     if (msg.tipo === 'audio' || mt.startsWith('audio/')) return '[Áudio]';
+    if (msg.tipo === 'image' || mt.startsWith('image/')) return '[Imagem]';
+    if (msg.tipo === 'video' || mt.startsWith('video/')) return '[Vídeo]';
+    if (msg.tipo === 'document' || (mt && !mt.startsWith('image/') && !mt.startsWith('video/') && !mt.startsWith('audio/') && Boolean(msg.media_url))) return '[Documento]';
     const parsed = parseReplyBlock(stripSignature((msg.conteudo || '').trim(), msg.sender_name));
     const raw = (parsed.body || parsed.quote || '').trim();
     if (raw.startsWith('sticker:')) return '[Figurinha]';
     return raw.replace(/\s+/g, ' ').slice(0, 80);
+  };
+
+  const getConversationPreview = (contact: Contato) => {
+    const last = lastMessages[contact.id] || null;
+    const raw = String(last?.conteudo || contact.resumo || contact.contato || '');
+    const mt = String(last?.mimetype || '').toLowerCase();
+    const tipo = (last?.tipo || null) as Mensagem['tipo'] | null;
+    const fileName = String(last?.file_name || '').trim();
+    const mediaUrl = String(last?.media_url || '').trim();
+    const parsed = parseReplyBlock(stripSignature(raw, null));
+    const body = String(parsed.body || parsed.quote || '').trim();
+    const isSticker = body.startsWith('sticker:') || body === '[Figurinha]';
+    const isAudio = tipo === 'audio' || mt.startsWith('audio/') || body === '[Áudio]';
+    const isImage = tipo === 'image' || mt.startsWith('image/') || body === '[Imagem]';
+    const isVideo = tipo === 'video' || mt.startsWith('video/') || body === '[Vídeo]';
+    const isDocument =
+      tipo === 'document' ||
+      body === '[Documento]' ||
+      (mt && !mt.startsWith('image/') && !mt.startsWith('video/') && !mt.startsWith('audio/') && Boolean(last?.media_url));
+
+    const text = shortenLine(body.replace(/\s+/g, ' ').trim(), 60);
+
+    if (isAudio) {
+      return { kind: 'audio' as const, icon: <Mic className="h-4 w-4 shrink-0 opacity-80" />, label: 'Áudio', detail: '', mediaUrl: mediaUrl || null };
+    }
+    if (isImage) {
+      const detail = /^\[(Imagem|Vídeo|Documento|Áudio|Figurinha)\]/.test(body) ? '' : text;
+      return { kind: 'image' as const, icon: <ImageIcon className="h-4 w-4 shrink-0 opacity-80" />, label: 'Imagem', detail, mediaUrl: mediaUrl || null };
+    }
+    if (isVideo) {
+      const detail = /^\[(Imagem|Vídeo|Documento|Áudio|Figurinha)\]/.test(body) ? '' : text;
+      return { kind: 'video' as const, icon: <Video className="h-4 w-4 shrink-0 opacity-80" />, label: 'Vídeo', detail, mediaUrl: mediaUrl || null };
+    }
+    if (isDocument) {
+      return { kind: 'document' as const, icon: <FileText className="h-4 w-4 shrink-0 opacity-80" />, label: fileName || 'Documento', detail: '', mediaUrl: mediaUrl || null };
+    }
+    if (isSticker) {
+      return { kind: 'sticker' as const, icon: <ImageIcon className="h-4 w-4 shrink-0 opacity-80" />, label: 'Figurinha', detail: '', mediaUrl: null };
+    }
+    return { kind: 'text' as const, icon: null as React.ReactNode, label: '', detail: shortenLine(raw.replace(/\s+/g, ' ').trim(), 60), mediaUrl: null };
+  };
+
+  const formatDuration = (durationSeconds: number) => {
+    const s = Number(durationSeconds);
+    if (!Number.isFinite(s) || s <= 0) return '—:—';
+    const total = Math.floor(s);
+    const mm = Math.floor(total / 60);
+    const ss = total % 60;
+    return `${mm}:${String(ss).padStart(2, '0')}`;
   };
 
   const isAudioMessage = (msg: Mensagem) => {
@@ -1094,7 +1148,17 @@ export default function ChatPage() {
       setMessages(prev => [...prev, optimistic]);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
     }
-    setLastMessages(prev => ({ ...prev, [target.id]: { conteudo: getMessageSnippet(optimistic), created_at: optimistic.created_at } }));
+    setLastMessages(prev => ({
+      ...prev,
+      [target.id]: {
+        conteudo: getMessageSnippet(optimistic),
+        created_at: optimistic.created_at,
+        tipo: optimistic.tipo ?? null,
+        mimetype: optimistic.mimetype ?? null,
+        file_name: optimistic.file_name ?? null,
+        media_url: optimistic.media_url ?? null,
+      }
+    }));
 
     try {
       const payloadFull: MensagemInsert = {
@@ -1273,7 +1337,7 @@ export default function ChatPage() {
       if (!empresaId || contacts.length === 0) return;
       const { data, error } = await sb
         .from('mensagens')
-        .select('contato_id, conteudo, created_at')
+        .select('contato_id, conteudo, created_at, tipo, mimetype, file_name, media_url')
         .eq('empresa_id', empresaId)
         .order('created_at', { ascending: false })
         .limit(1000);
@@ -1281,12 +1345,19 @@ export default function ChatPage() {
         console.error(error);
         return;
       }
-      const map: Record<string, { conteudo: string; created_at: string }> = {};
-      const rows = (data || []) as Array<{ contato_id: string; conteudo: string; created_at: string }>;
+      const map: Record<string, { conteudo: string; created_at: string; tipo?: Mensagem['tipo'] | null; mimetype?: string | null; file_name?: string | null; media_url?: string | null }> = {};
+      const rows = (data || []) as Array<{ contato_id: string; conteudo: string; created_at: string; tipo?: Mensagem['tipo'] | null; mimetype?: string | null; file_name?: string | null; media_url?: string | null }>;
       rows.forEach((m) => {
         const cid = m.contato_id as string;
         if (!map[cid]) {
-          map[cid] = { conteudo: m.conteudo as string, created_at: m.created_at as string };
+          map[cid] = {
+            conteudo: m.conteudo as string,
+            created_at: m.created_at as string,
+            tipo: m.tipo ?? null,
+            mimetype: m.mimetype ?? null,
+            file_name: m.file_name ?? null,
+            media_url: m.media_url ?? null,
+          };
         }
       });
       setLastMessages(map);
@@ -1346,7 +1417,17 @@ export default function ChatPage() {
         // Atualiza preview
         const m = payload.new as unknown as Mensagem;
         const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
-        setLastMessages(prev => ({ ...prev, [m.contato_id]: { conteudo: previewText, created_at: m.created_at } }));
+        setLastMessages(prev => ({
+          ...prev,
+          [m.contato_id]: {
+            conteudo: previewText,
+            created_at: m.created_at,
+            tipo: m.tipo ?? null,
+            mimetype: m.mimetype ?? null,
+            file_name: m.file_name ?? null,
+            media_url: m.media_url ?? null,
+          }
+        }));
         // Scroll
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
       })
@@ -1370,7 +1451,17 @@ export default function ChatPage() {
         const m = payload.new as unknown as Mensagem;
         if (!m?.contato_id) return;
         const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
-        setLastMessages(prev => ({ ...prev, [m.contato_id]: { conteudo: previewText, created_at: m.created_at } }));
+        setLastMessages(prev => ({
+          ...prev,
+          [m.contato_id]: {
+            conteudo: previewText,
+            created_at: m.created_at,
+            tipo: m.tipo ?? null,
+            mimetype: m.mimetype ?? null,
+            file_name: m.file_name ?? null,
+            media_url: m.media_url ?? null,
+          }
+        }));
 
         if (m.direcao === 'in') {
           const isViewing =
@@ -1429,7 +1520,17 @@ export default function ChatPage() {
     };
     setMessages(prev => [...prev, optimistic]);
     // Atualiza preview e rolagem
-    setLastMessages(prev => ({ ...prev, [selectedContact.id]: { conteudo: text, created_at: optimistic.created_at } }));
+    setLastMessages(prev => ({
+      ...prev,
+      [selectedContact.id]: {
+        conteudo: text,
+        created_at: optimistic.created_at,
+        tipo: optimistic.tipo ?? null,
+        mimetype: optimistic.mimetype ?? null,
+        file_name: optimistic.file_name ?? null,
+        media_url: optimistic.media_url ?? null,
+      }
+    }));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
 
     try {
@@ -1614,7 +1715,17 @@ export default function ChatPage() {
       created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, optimistic]);
-    setLastMessages(prev => ({ ...prev, [selectedContact.id]: { conteudo: '[Figurinha]', created_at: optimistic.created_at } }));
+    setLastMessages(prev => ({
+      ...prev,
+      [selectedContact.id]: {
+        conteudo: '[Figurinha]',
+        created_at: optimistic.created_at,
+        tipo: optimistic.tipo ?? null,
+        mimetype: optimistic.mimetype ?? null,
+        file_name: optimistic.file_name ?? null,
+        media_url: optimistic.media_url ?? null,
+      }
+    }));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
 
     try {
@@ -1732,6 +1843,46 @@ export default function ChatPage() {
     loadEtiquetasForContacts(visibleContactIds);
   }, [empresaId, visibleContactIds.join(',')]);
 
+  useEffect(() => {
+    const urls: string[] = [];
+    visibleContacts.forEach((c) => {
+      const last = lastMessages[c.id] || null;
+      const mt = String(last?.mimetype || '').toLowerCase();
+      const tipo = (last?.tipo || null) as Mensagem['tipo'] | null;
+      const isAudio = tipo === 'audio' || mt.startsWith('audio/');
+      const url = String(last?.media_url || '').trim();
+      if (isAudio && url) urls.push(url);
+    });
+
+    urls.forEach((url) => {
+      if (mediaDurations[url] != null) return;
+      const inflight = durationInflightRef.current;
+      if (inflight.has(url)) return;
+      inflight.add(url);
+
+      const audio = new Audio();
+      audio.preload = 'metadata';
+      const done = () => {
+        inflight.delete(url);
+        audio.src = '';
+      };
+      const onLoaded = () => {
+        const d = Number(audio.duration);
+        if (Number.isFinite(d) && d > 0) {
+          setMediaDurations((prev) => (prev[url] != null ? prev : { ...prev, [url]: d }));
+        }
+        done();
+      };
+      const onError = () => {
+        done();
+      };
+
+      audio.addEventListener('loadedmetadata', onLoaded);
+      audio.addEventListener('error', onError);
+      audio.src = url;
+    });
+  }, [visibleContactIds.join(','), lastMessages, mediaDurations]);
+
   return (
     <AppLayout>
       <div className="flex h-[calc(100dvh-100px)] overflow-hidden rounded-xl border bg-background shadow-lg w-full flex-col md:flex-row">
@@ -1784,7 +1935,7 @@ export default function ChatPage() {
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
-              const previewShort = shortenLine(lastMessages[contact.id]?.conteudo || contact.resumo || contact.contato || '', 40);
+              const preview = getConversationPreview(contact);
               return (
                 <div
                   key={contact.id}
@@ -1835,9 +1986,32 @@ export default function ChatPage() {
                       </div>
                     ) : null}
                     <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p className="flex-1 min-w-0 text-sm text-muted-foreground truncate">
-                        {previewShort}
-                      </p>
+                      <div className="flex-1 min-w-0 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {preview.kind === 'audio' ? (
+                            <>
+                              {preview.icon}
+                              <span className="shrink-0 font-medium">{preview.label}</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="h-1.5 w-14 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full w-2/5 bg-muted-foreground/60" />
+                                </div>
+                                <span className="text-xs tabular-nums opacity-80">
+                                  {preview.mediaUrl ? formatDuration(mediaDurations[preview.mediaUrl] ?? 0) : '—:—'}
+                                </span>
+                              </div>
+                            </>
+                          ) : preview.label ? (
+                            <>
+                              {preview.icon}
+                              <span className="shrink-0 font-medium">{preview.label}</span>
+                              {preview.detail ? <span className="truncate opacity-80">{preview.detail}</span> : null}
+                            </>
+                          ) : (
+                            <span className="truncate">{preview.detail}</span>
+                          )}
+                        </div>
+                      </div>
                       {unread > 0 ? (
                         <span className="shrink-0 min-w-[18px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
                           {unread}
