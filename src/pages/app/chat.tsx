@@ -78,7 +78,7 @@ type Mensagem = {
   external_id?: string | null;
   sender_user_id?: string | null;
   sender_name?: string | null;
-  tipo?: 'text' | 'image' | 'video' | 'document' | 'audio' | null;
+  tipo?: 'text' | 'image' | 'video' | 'document' | 'audio' | 'sticker' | null;
   media_url?: string | null;
   mimetype?: string | null;
   file_name?: string | null;
@@ -2224,11 +2224,12 @@ export default function ChatPage() {
               {messages.map((msg) => {
                 const rendered = parseReplyBlock(stripSignature(msg.conteudo, msg.sender_name));
                 const bodyText = rendered.body || '';
-                const isAutoCaption = /^\[(Imagem|Vídeo|Documento|Áudio)\]/.test(bodyText.trim());
+                const isAutoCaption = /^\[(Imagem|Vídeo|Documento|Áudio|Figurinha)\]/.test(bodyText.trim()) && Boolean(msg.media_url);
                 const captionText = isAutoCaption ? '' : bodyText;
                 const pixKey = extractPixKey(captionText || bodyText);
                 const mt = (msg.mimetype || '').toLowerCase();
-                const isImage = (msg.tipo === 'image' || mt.startsWith('image/')) && Boolean(msg.media_url);
+                const isSticker = (msg.tipo === 'sticker' || (mt === 'image/webp' && bodyText.trim() === '[Figurinha]')) && Boolean(msg.media_url);
+                const isImage = !isSticker && (msg.tipo === 'image' || mt.startsWith('image/')) && Boolean(msg.media_url);
                 const isVideo = (msg.tipo === 'video' || mt.startsWith('video/')) && Boolean(msg.media_url);
                 const isDocument = (msg.tipo === 'document' || (mt && !mt.startsWith('image/') && !mt.startsWith('video/') && !mt.startsWith('audio/'))) && Boolean(msg.media_url);
                 const quoteText = rendered.quote || (msg.reply_to_preview ? String(msg.reply_to_preview) : null);
@@ -2281,6 +2282,11 @@ export default function ChatPage() {
                               )
                             ) : msg.conteudo.startsWith('sticker:data:') ? (
                               <img src={msg.conteudo.slice('sticker:'.length)} className="max-w-[220px] rounded-lg mt-1" alt="Figurinha" />
+                            ) : isSticker ? (
+                              <div className="mt-1">
+                                {quoteBox}
+                                <img src={msg.media_url || ''} className="max-w-[220px] mt-1" alt="Figurinha" />
+                              </div>
                             ) : isImage ? (
                               <div className="mt-1">
                                 {quoteBox}
@@ -2340,6 +2346,11 @@ export default function ChatPage() {
                           )
                         ) : msg.conteudo.startsWith('sticker:data:') ? (
                           <img src={msg.conteudo.slice('sticker:'.length)} className="max-w-[220px] rounded-lg" alt="Figurinha" />
+                        ) : isSticker ? (
+                          <div>
+                            {quoteBox}
+                            <img src={msg.media_url || ''} className="max-w-[220px]" alt="Figurinha" />
+                          </div>
                         ) : isImage ? (
                           <div>
                             {quoteBox}

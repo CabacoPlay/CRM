@@ -100,9 +100,11 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    const url = shouldSendMedia
-      ? `${baseUrl}/message/sendMedia/${instance}`
-      : `${baseUrl}/message/sendText/${instance}`;
+    const url = isSticker
+      ? `${baseUrl}/message/sendSticker/${instance}`
+      : shouldSendMedia
+        ? `${baseUrl}/message/sendMedia/${instance}`
+        : `${baseUrl}/message/sendText/${instance}`;
     const signedText = (() => {
       const name = (senderNameOverride || (msg as any)?.sender_name) as string | null | undefined;
       const base = String(msg.conteudo || "");
@@ -138,13 +140,11 @@ Deno.serve(async (req: Request) => {
       ? (() => {
           const raw = String(msg.conteudo || "").slice("sticker:".length);
           const { mimetype, base64 } = stripDataUrl(raw);
+          const sticker = String(base64 || "").trim();
           return {
             number,
-            mediatype: "sticker",
+            sticker,
             mimetype: mimetype || "image/webp",
-            caption: "",
-            media: base64,
-            fileName: "sticker.webp",
           };
         })()
       : shouldSendMedia
@@ -170,14 +170,44 @@ Deno.serve(async (req: Request) => {
         : quoted
           ? { number, text: signedText, quoted }
           : { number, text: signedText };
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": apikey
-      },
-      body: JSON.stringify(payload)
-    });
+    const doPost = (u: string, p: unknown) =>
+      fetch(u, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": apikey
+        },
+        body: JSON.stringify(p)
+      });
+
+    let response = await doPost(url, payload).catch(() => null);
+    if (!response && isSticker) {
+      response = await doPost(url, payload).catch(() => null);
+    }
+    if (response && !response.ok && isSticker) {
+      const legacyPayload = (() => {
+        const raw = String(msg.conteudo || "").slice("sticker:".length);
+        const { mimetype, base64 } = stripDataUrl(raw);
+        const sticker = String(base64 || "").trim();
+        return {
+          number,
+          stickerMessage: { image: sticker },
+          mimetype: mimetype || "image/webp",
+        };
+      })();
+      const retry = await doPost(url, legacyPayload).catch(() => null);
+      if (retry) response = retry;
+    }
+    if (!response) {
+      await supabase
+        .from("mensagens")
+        .update({ status: "erro" } as any)
+        .eq("id", messageId);
+      return new Response(JSON.stringify({ error: "send failed", details: "network_error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     if (!response.ok) {
       await supabase
         .from("mensagens")

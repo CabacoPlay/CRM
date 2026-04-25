@@ -110,6 +110,7 @@ function decodeBase64ToBytes(base64: string) {
 function extensionFromMime(mimetype: string | null | undefined) {
   const mt = String(mimetype || "").toLowerCase();
   if (!mt) return "bin";
+  if (mt.includes("image/webp")) return "webp";
   if (mt.includes("audio/ogg")) return "ogg";
   if (mt.includes("audio/opus")) return "opus";
   if (mt.includes("audio/mpeg") || mt.includes("audio/mp3")) return "mp3";
@@ -1037,6 +1038,7 @@ function detectMessageType(msg: any) {
   if (msg?.buttonsMessage) return "buttonsMessage";
   if (msg?.extendedTextMessage) return "extendedTextMessage";
   if (msg?.conversation) return "conversation";
+  if (msg?.stickerMessage) return "stickerMessage";
   if (msg?.imageMessage) return "imageMessage";
   if (msg?.audioMessage) return "audioMessage";
   if (msg?.videoMessage) return "videoMessage";
@@ -1282,6 +1284,7 @@ function fallbackContentForType(msgType: string) {
   if (msgType === "imageMessage") return "[Imagem]";
   if (msgType === "videoMessage") return "[Vídeo]";
   if (msgType === "documentMessage") return "[Documento]";
+  if (msgType === "stickerMessage") return "[Figurinha]";
   if (msgType === "buttonsMessage") return "[Botões]";
   if (msgType === "buttonsResponseMessage" || msgType === "templateButtonReplyMessage" || msgType === "interactiveResponseMessage" || msgType === "listResponseMessage") {
     return "[Interação]";
@@ -1844,13 +1847,13 @@ Deno.serve(async (req: Request) => {
             .eq("id", contatoId);
         }
 
-        let tipo: "text" | "image" | "video" | "document" | "audio" = "text";
+        let tipo: "text" | "image" | "video" | "document" | "audio" | "sticker" = "text";
         let mediaUrl: string | null = null;
         let mimetype: string | null = null;
         let fileName: string | null = null;
         let durationMs: number | null = null;
 
-        if (msgType === "imageMessage" || msgType === "videoMessage" || msgType === "documentMessage" || msgType === "audioMessage") {
+        if (msgType === "imageMessage" || msgType === "videoMessage" || msgType === "documentMessage" || msgType === "audioMessage" || msgType === "stickerMessage") {
           tipo =
             msgType === "imageMessage"
               ? "image"
@@ -1858,7 +1861,9 @@ Deno.serve(async (req: Request) => {
                 ? "video"
                 : msgType === "documentMessage"
                   ? "document"
-                  : "audio";
+                  : msgType === "stickerMessage"
+                    ? "image"
+                    : "audio";
           const node =
             msgType === "imageMessage"
               ? (msgInner?.imageMessage || {})
@@ -1866,9 +1871,14 @@ Deno.serve(async (req: Request) => {
                 ? (msgInner?.videoMessage || {})
                 : msgType === "documentMessage"
                   ? (msgInner?.documentMessage || {})
-                  : (msgInner?.audioMessage || {});
+                  : msgType === "stickerMessage"
+                    ? (msgInner?.stickerMessage || {})
+                    : (msgInner?.audioMessage || {});
 
           mimetype = (node?.mimetype as string | undefined) || mimetype;
+          if (msgType === "stickerMessage") {
+            mimetype = mimetype || "image/webp";
+          }
 
           if (msgType === "audioMessage") {
             const seconds = Number(node?.seconds);
@@ -1922,6 +1932,8 @@ Deno.serve(async (req: Request) => {
                 fileName = `image-${safeId}.${ext}`;
               } else if (msgType === "videoMessage") {
                 fileName = `video-${safeId}.${ext}`;
+              } else if (msgType === "stickerMessage") {
+                fileName = `sticker-${safeId}.${ext}`;
               } else {
                 fileName = (node?.fileName as string | undefined) || `document-${safeId}.${ext}`;
               }
