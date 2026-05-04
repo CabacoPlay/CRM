@@ -23,7 +23,7 @@ interface Usuario {
   telefone: string;
   email: string;
   empresa_id?: string;
-  papel: 'admin' | 'cliente';
+  papel: 'admin' | 'cliente' | 'colaborador';
   avatar_url?: string | null;
   created_at?: string;
 }
@@ -133,8 +133,9 @@ export default function AdminUsuarios() {
   const stats = useMemo(() => {
     const total = usuarios.length;
     const admins = usuarios.filter(u => u.papel === 'admin').length;
-    const clientes = total - admins;
-    return { total, admins, clientes };
+    const clientes = usuarios.filter(u => u.papel === 'cliente').length;
+    const colaboradores = usuarios.filter(u => u.papel === 'colaborador').length;
+    return { total, admins, clientes, colaboradores };
   }, [usuarios]);
 
   const handleCreate = async () => {
@@ -143,9 +144,9 @@ export default function AdminUsuarios() {
       return;
     }
 
-    // Admins don't need empresa_id, but clientes do
-    if (formData.papel === 'cliente' && !formData.empresa_id) {
-      setFormError('Clientes devem estar associados a uma empresa');
+    // Admins don't need empresa_id, but non-admins do
+    if (formData.papel !== 'admin' && !formData.empresa_id) {
+      setFormError('Usuários não-admin devem estar associados a uma empresa');
       return;
     }
 
@@ -153,11 +154,11 @@ export default function AdminUsuarios() {
       setSubmitting(true);
       setFormError('');
 
-      if (formData.papel === 'cliente' && formData.empresa_id) {
+      if (formData.papel !== 'admin' && formData.empresa_id) {
         const empresa = empresas.find(e => e.id === formData.empresa_id) || null;
         const plan = normalizePlan(empresa?.billing_plan);
         const limits = planLimits(plan);
-        const countLocal = usuarios.filter(u => u.empresa_id === formData.empresa_id && u.papel === 'cliente').length;
+        const countLocal = usuarios.filter(u => u.empresa_id === formData.empresa_id && u.papel !== 'admin').length;
         if (countLocal >= limits.users) {
           setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
           setSubmitting(false);
@@ -227,9 +228,9 @@ export default function AdminUsuarios() {
       return;
     }
 
-    // Admins don't need empresa_id, but clientes do
-    if (formData.papel === 'cliente' && !formData.empresa_id) {
-      setFormError('Clientes devem estar associados a uma empresa');
+    // Admins don't need empresa_id, but non-admins do
+    if (formData.papel !== 'admin' && !formData.empresa_id) {
+      setFormError('Usuários não-admin devem estar associados a uma empresa');
       return;
     }
 
@@ -240,11 +241,11 @@ export default function AdminUsuarios() {
       const nextEmpresaId = formData.papel === 'admin' ? null : formData.empresa_id || null;
       const prevEmpresaId = editingUsuario.empresa_id || null;
       const empresaChanged = nextEmpresaId !== prevEmpresaId;
-      if (formData.papel === 'cliente' && nextEmpresaId && (empresaChanged || editingUsuario.papel !== 'cliente')) {
+      if (formData.papel !== 'admin' && nextEmpresaId && (empresaChanged || editingUsuario.papel === 'admin')) {
         const empresa = empresas.find(e => e.id === nextEmpresaId) || null;
         const plan = normalizePlan(empresa?.billing_plan);
         const limits = planLimits(plan);
-        const countLocal = usuarios.filter(u => u.empresa_id === nextEmpresaId && u.papel === 'cliente' && u.id !== editingUsuario.id).length;
+        const countLocal = usuarios.filter(u => u.empresa_id === nextEmpresaId && u.papel !== 'admin' && u.id !== editingUsuario.id).length;
         if (countLocal >= limits.users) {
           setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
           setSubmitting(false);
@@ -358,15 +359,24 @@ export default function AdminUsuarios() {
   const getPapelBadge = (papel: Usuario['papel']) => {
     const variants = {
       admin: 'default' as const,
-      cliente: 'secondary' as const
+      cliente: 'secondary' as const,
+      colaborador: 'outline' as const
     };
     
     const labels = {
       admin: 'Admin',
-      cliente: 'Cliente'
+      cliente: 'Cliente',
+      colaborador: 'Colaborador'
     };
     
-    return <Badge variant={variants[papel]}>{labels[papel]}</Badge>;
+    const color =
+      papel === 'admin'
+        ? 'bg-red-600 text-white hover:bg-red-600 border-red-600'
+        : papel === 'colaborador'
+          ? 'bg-orange-500 text-white hover:bg-orange-500 border-orange-500'
+          : '';
+
+    return <Badge variant={variants[papel]} className={color}>{labels[papel]}</Badge>;
   };
 
   const resetForm = () => {
@@ -411,6 +421,7 @@ export default function AdminUsuarios() {
               <span>Total: <span className="text-foreground font-medium">{stats.total}</span></span>
               <span>Admins: <span className="text-foreground font-medium">{stats.admins}</span></span>
               <span>Clientes: <span className="text-foreground font-medium">{stats.clientes}</span></span>
+              <span>Colaboradores: <span className="text-foreground font-medium">{stats.colaboradores}</span></span>
             </div>
             <ToggleGroup
               type="single"
@@ -540,7 +551,7 @@ export default function AdminUsuarios() {
                           </div>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <User className="h-4 w-4" />
-                            <span className="truncate">{u.papel === 'admin' ? 'Admin' : 'Cliente'}</span>
+                            <span className="truncate">{u.papel === 'admin' ? 'Admin' : u.papel === 'colaborador' ? 'Colaborador' : 'Cliente'}</span>
                           </div>
                         </div>
                         <div className="flex justify-end gap-2">
@@ -639,12 +650,13 @@ export default function AdminUsuarios() {
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
-                <Label>Empresa {formData.papel === 'cliente' && '*'}</Label>
+                <Label>Empresa {formData.papel !== 'admin' && '*'}</Label>
                 <Select 
                   value={formData.empresa_id} 
                   onValueChange={(value) => {

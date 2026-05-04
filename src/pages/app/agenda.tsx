@@ -32,7 +32,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, maskContactNumber } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -85,6 +85,7 @@ const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 export default function AgendaPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const canViewContactPhone = user?.papel !== 'colaborador' || Boolean(user?.can_view_contact_phone);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -179,10 +180,14 @@ export default function AgendaPage() {
           .eq('empresa_id', user.empresa_id)
           .order('updated_at', { ascending: false })
           .limit(20);
-        if (onlyDigits) {
-          sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${onlyDigits}%`);
+        if (canViewContactPhone) {
+          if (onlyDigits) {
+            sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${onlyDigits}%`);
+          } else {
+            sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${q}%`);
+          }
         } else {
-          sel = sel.or(`nome.ilike.%${q}%,contato.ilike.%${q}%`);
+          sel = sel.or(`nome.ilike.%${q}%`);
         }
         const { data } = await sel;
         if (!disposed) setContactResults((data || []) as Array<{ id: string; nome: string; contato: string }>);
@@ -195,7 +200,7 @@ export default function AgendaPage() {
       disposed = true;
       clearTimeout(t);
     };
-  }, [formData.nome_cliente, user?.empresa_id]);
+  }, [canViewContactPhone, formData.nome_cliente, user?.empresa_id]);
 
   useEffect(() => {
     if (date) setCalendarMonth(date);
@@ -633,7 +638,11 @@ export default function AgendaPage() {
                               <div className="p-1 bg-muted rounded">
                                 <Phone className="h-3.5 w-3.5 text-success" />
                               </div>
-                              <span className="font-mono">{appt.contato_cliente || '(Número não informado)'}</span>
+                              <span className="font-mono">
+                                {appt.contato_cliente
+                                  ? (canViewContactPhone ? appt.contato_cliente : maskContactNumber(appt.contato_cliente))
+                                  : '(Número não informado)'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -720,7 +729,7 @@ export default function AgendaPage() {
                         }}
                       >
                         <div className="text-sm font-medium">{c.nome || 'Sem nome'}</div>
-                        <div className="text-xs text-muted-foreground">{phone}</div>
+                        <div className="text-xs text-muted-foreground">{canViewContactPhone ? phone : maskContactNumber(phone)}</div>
                       </button>
                     );
                   })}

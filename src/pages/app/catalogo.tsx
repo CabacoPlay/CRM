@@ -17,9 +17,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { CatalogItem, Categoria } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { Navigate } from 'react-router-dom';
 
 export default function Catalogo() {
   const { user } = useAuth();
+  if (user?.papel === 'colaborador' && !user.can_access_catalogo) {
+    return <Navigate to="/app/chat" replace />;
+  }
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);

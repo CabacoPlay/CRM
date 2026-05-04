@@ -81,6 +81,52 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     void fillMissingAvatar();
   }, [user?.id]);
 
+  useEffect(() => {
+    const loadPermissions = async () => {
+      if (!user?.id) return;
+      if (!user?.empresa_id) return;
+      if (user.papel !== 'colaborador') {
+        if (user.can_view_contact_phone === undefined) updateUser({ can_view_contact_phone: true });
+        if (user.can_access_ia === undefined) updateUser({ can_access_ia: true });
+        if (user.can_access_catalogo === undefined) updateUser({ can_access_catalogo: true });
+        if (user.can_access_catalogo_publico === undefined) updateUser({ can_access_catalogo_publico: true });
+        if (user.can_access_orcamentos === undefined) updateUser({ can_access_orcamentos: true });
+        return;
+      }
+      if (
+        user.can_view_contact_phone !== undefined &&
+        user.can_access_ia !== undefined &&
+        user.can_access_catalogo !== undefined &&
+        user.can_access_catalogo_publico !== undefined &&
+        user.can_access_orcamentos !== undefined
+      ) return;
+      try {
+        const { data } = await supabase
+          .from('usuario_permissoes')
+          .select('can_view_contact_phone,can_access_ia,can_access_catalogo,can_access_catalogo_publico,can_access_orcamentos')
+          .eq('empresa_id', user.empresa_id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        updateUser({
+          can_view_contact_phone: Boolean(data?.can_view_contact_phone),
+          can_access_ia: Boolean(data?.can_access_ia),
+          can_access_catalogo: Boolean(data?.can_access_catalogo),
+          can_access_catalogo_publico: Boolean(data?.can_access_catalogo_publico),
+          can_access_orcamentos: Boolean(data?.can_access_orcamentos),
+        });
+      } catch {
+        updateUser({
+          can_view_contact_phone: false,
+          can_access_ia: false,
+          can_access_catalogo: false,
+          can_access_catalogo_publico: false,
+          can_access_orcamentos: false,
+        });
+      }
+    };
+    void loadPermissions();
+  }, [user?.id, user?.empresa_id, user?.papel]);
+
   const sendAuthToken = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke('send-auth-token', {

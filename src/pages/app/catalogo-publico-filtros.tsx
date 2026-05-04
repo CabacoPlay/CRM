@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { CatalogItem } from '@/types';
 import { Copy, Link2, Plus, Trash2 } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 
 type AttributeStep = {
   id: string;
@@ -84,6 +85,9 @@ function newId() {
 
 export default function CatalogoPublicoFiltrosConfigPage() {
   const { user } = useAuth();
+  if (user?.papel === 'colaborador' && !user.can_access_catalogo_publico) {
+    return <Navigate to="/app/chat" replace />;
+  }
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);

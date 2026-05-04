@@ -13,7 +13,7 @@ import { Search, MessageSquare, Send, Loader2, Phone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { formatContactName } from '@/lib/utils';
+import { formatContactDisplay, formatContactDisplayName, formatContactName } from '@/lib/utils';
 
 type ContatoRow = {
   id: string;
@@ -102,6 +102,7 @@ export default function ContatosPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const empresaId = user?.empresa_id ?? null;
+  const canViewContactPhone = user?.papel !== 'colaborador' || Boolean(user?.can_view_contact_phone);
 
   const [loading, setLoading] = useState(true);
   const [contatos, setContatos] = useState<ContatoRow[]>([]);
@@ -149,6 +150,9 @@ export default function ContatosPage() {
       const nome = String(c.nome || '').toLowerCase();
       const contato = String(c.contato || '').toLowerCase();
       const resumo = String(c.resumo || '').toLowerCase();
+      if (!canViewContactPhone) {
+        return nome.includes(q) || resumo.includes(q);
+      }
       return (
         nome.includes(q) ||
         contato.includes(q) ||
@@ -157,7 +161,7 @@ export default function ContatosPage() {
       );
     });
     return list;
-  }, [contatos, search]);
+  }, [canViewContactPhone, contatos, search]);
 
   const openChat = (c: ContatoRow) => {
     navigate(`/app/chat?contato=${encodeURIComponent(c.id)}`);
@@ -436,14 +440,14 @@ export default function ContatosPage() {
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="font-bold truncate">{formatContactName(c.nome)}</div>
+                            <div className="font-bold truncate">{formatContactDisplayName(c.nome, c.contato, canViewContactPhone)}</div>
                             <Badge variant={status === 'resolvida' ? 'secondary' : 'default'} className="h-5">
                               {status === 'resolvida' ? 'Resolvida' : 'Aberta'}
                             </Badge>
                           </div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <Phone className="h-3 w-3" />
-                            <span className="break-all">{formatContactName(c.contato)}</span>
+                            <span className="break-all">{formatContactDisplay(c.contato, canViewContactPhone)}</span>
                           </div>
                           {c.resumo && (
                             <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">

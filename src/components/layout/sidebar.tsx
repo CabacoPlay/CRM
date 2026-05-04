@@ -48,7 +48,19 @@ export function Sidebar() {
   const { user } = useAuth();
   const location = useLocation();
   
-  const navItems = user?.papel === 'admin' ? adminNavItems : clientNavItems;
+  const canAccessIA = user?.papel !== 'colaborador' || Boolean(user?.can_access_ia);
+  const canAccessCatalogo = user?.papel !== 'colaborador' || Boolean(user?.can_access_catalogo);
+  const canAccessCatalogoPublico = user?.papel !== 'colaborador' || Boolean(user?.can_access_catalogo_publico);
+  const canAccessOrcamentos = user?.papel !== 'colaborador' || Boolean(user?.can_access_orcamentos);
+
+  const navItems = (user?.papel === 'admin' ? adminNavItems : clientNavItems).filter((it) => {
+    if (user?.papel !== 'colaborador') return true;
+    if (it.href === '/app/ia') return canAccessIA;
+    if (it.href === '/app/catalogo') return canAccessCatalogo;
+    if (it.href === '/app/catalogo-publico') return canAccessCatalogoPublico;
+    if (it.href === '/app/orcamentos') return canAccessOrcamentos;
+    return true;
+  });
 
   useEffect(() => {
     if (window.innerWidth < 1280) {

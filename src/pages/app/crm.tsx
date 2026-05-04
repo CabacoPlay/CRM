@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Fase, Contato, Nota } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { formatContactName, cn } from '@/lib/utils';
+import { formatContactDisplay, formatContactDisplayName, formatContactName, cn } from '@/lib/utils';
 import {
   DndContext,
   DragEndEvent,
@@ -44,7 +44,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Draggable Contact Card Component
-function DraggableContact({ contato, onOpenContato }: { contato: Contato; onOpenContato: (contato: Contato) => void }) {
+function DraggableContact({ contato, onOpenContato, canViewContactPhone }: { contato: Contato; onOpenContato: (contato: Contato) => void; canViewContactPhone: boolean }) {
   const {
     attributes,
     listeners,
@@ -86,16 +86,16 @@ function DraggableContact({ contato, onOpenContato }: { contato: Contato; onOpen
               <Avatar className="h-9 w-9 shrink-0 border border-border/50">
                 <AvatarImage src={contato.profile_img_url} />
                 <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-bold">
-                  {formatContactName(contato.nome).split(' ').map(n => n[0]).join('').toUpperCase()}
+                  {formatContactDisplayName(contato.nome, contato.contato, canViewContactPhone).split(' ').map(n => n[0]).join('').toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0 overflow-hidden">
                 <h4 className="font-bold text-sm text-card-foreground group-hover:text-primary transition-colors leading-tight break-words">
-                  {formatContactName(contato.nome)}
+                  {formatContactDisplayName(contato.nome, contato.contato, canViewContactPhone)}
                 </h4>
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
                   <Phone className="h-3 w-3 shrink-0" />
-                  <span className="break-all">{formatContactName(contato.contato)}</span>
+                  <span className="break-all">{formatContactDisplay(contato.contato, canViewContactPhone)}</span>
                 </div>
               </div>
             </div>
@@ -440,6 +440,7 @@ export default function CRM() {
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const canViewContactPhone = user?.papel !== 'colaborador' || Boolean(user?.can_view_contact_phone);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -960,6 +961,7 @@ export default function CRM() {
                                   key={contato.id}
                                   contato={contato}
                                   onOpenContato={handleOpenContato}
+                                  canViewContactPhone={canViewContactPhone}
                                 />
                               ))}
                               
@@ -986,6 +988,7 @@ export default function CRM() {
                   <DraggableContact
                     contato={activeContact}
                     onOpenContato={() => {}}
+                    canViewContactPhone={canViewContactPhone}
                   />
                 </div>
               ) : null}
@@ -1018,14 +1021,14 @@ export default function CRM() {
                         <Avatar className="h-16 w-16">
                           <AvatarImage src={selectedContato.profile_img_url} />
                           <AvatarFallback className="text-lg">
-                            {formatContactName(selectedContato.nome).split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {formatContactDisplayName(selectedContato.nome, selectedContato.contato, canViewContactPhone).split(' ').map(n => n[0]).join('').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="text-xl font-semibold">{formatContactName(selectedContato.nome)}</h3>
+                          <h3 className="text-xl font-semibold">{formatContactDisplayName(selectedContato.nome, selectedContato.contato, canViewContactPhone)}</h3>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Phone className="h-4 w-4" />
-                            <span>{formatContactName(selectedContato.contato)}</span>
+                            <span>{formatContactDisplay(selectedContato.contato, canViewContactPhone)}</span>
                           </div>
                         </div>
                      </div>

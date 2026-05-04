@@ -1456,6 +1456,57 @@ export type Database = {
           },
         ]
       }
+      usuario_permissoes: {
+        Row: {
+          can_access_catalogo: boolean
+          can_access_catalogo_publico: boolean
+          can_access_ia: boolean
+          can_access_orcamentos: boolean
+          can_view_contact_phone: boolean
+          created_at: string
+          empresa_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_access_catalogo?: boolean
+          can_access_catalogo_publico?: boolean
+          can_access_ia?: boolean
+          can_access_orcamentos?: boolean
+          can_view_contact_phone?: boolean
+          created_at?: string
+          empresa_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_access_catalogo?: boolean
+          can_access_catalogo_publico?: boolean
+          can_access_ia?: boolean
+          can_access_orcamentos?: boolean
+          can_view_contact_phone?: boolean
+          created_at?: string
+          empresa_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_permissoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuario_permissoes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1466,7 +1517,7 @@ export type Database = {
     Enums: {
       catalog_item_type: "Produto" | "Serviço"
       ia_personalidade: "Formal" | "Informal" | "Casual"
-      usuario_papel: "admin" | "cliente"
+      usuario_papel: "admin" | "cliente" | "colaborador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1596,7 +1647,7 @@ export const Constants = {
     Enums: {
       catalog_item_type: ["Produto", "Serviço"],
       ia_personalidade: ["Formal", "Informal", "Casual"],
-      usuario_papel: ["admin", "cliente"],
+      usuario_papel: ["admin", "cliente", "colaborador"],
     },
   },
 } as const

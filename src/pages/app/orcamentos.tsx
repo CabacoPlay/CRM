@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/integrations/supabase/client';
 import { FileDown, Plus, Trash2, Upload } from 'lucide-react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { Navigate } from 'react-router-dom';
 
 type CatalogItem = {
   id: string;
@@ -81,6 +82,9 @@ async function fetchAsUint8(url: string) {
 
 export default function OrcamentosPage() {
   const { user } = useAuth();
+  if (user?.papel === 'colaborador' && !user.can_access_orcamentos) {
+    return <Navigate to="/app/chat" replace />;
+  }
   const { toast } = useToast();
   const empresaId = user?.empresa_id ?? null;
 

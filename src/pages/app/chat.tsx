@@ -33,7 +33,7 @@ import {
   Download,
   X
 } from 'lucide-react';
-import { cn, getBrandLogoUrl, resolveTheme } from '@/lib/utils';
+import { cn, formatContactDisplay, formatContactDisplayName, getBrandLogoUrl, resolveTheme } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
@@ -301,6 +301,7 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
 
   const empresaId = user?.empresa_id ?? null;
+  const canViewContactPhone = user?.papel !== 'colaborador' || Boolean(user?.can_view_contact_phone);
   const initialContactId = searchParams.get('contato') || '';
 
   const [isMobile, setIsMobile] = useState(false);
@@ -457,13 +458,14 @@ export default function ChatPage() {
     await sb.from('contatos').update({ atendimento_mode: mode }).eq('id', contactId);
   };
 
-  const initials = useMemo(
-    () =>
-      selectedContact?.nome
-        ? selectedContact.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-        : 'CT',
-    [selectedContact]
-  );
+  const initials = useMemo(() => {
+    const safeName = selectedContact
+      ? formatContactDisplayName(String(selectedContact.nome || ''), String(selectedContact.contato || ''), canViewContactPhone)
+      : '';
+    return safeName
+      ? safeName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      : 'CT';
+  }, [canViewContactPhone, selectedContact]);
 
   const shortenLine = (value: string, max: number) => {
     const t = String(value || '').replace(/\s+/g, ' ').trim();
@@ -1941,6 +1943,9 @@ export default function ChatPage() {
         const preview = String(lastMessages[c.id]?.conteudo || c.resumo || '').toLowerCase();
         const onlyDigits = (s: string) => s.replace(/\D/g, '');
         const qDigits = onlyDigits(q);
+        if (!canViewContactPhone) {
+          return nome.includes(q) || preview.includes(q);
+        }
         return (
           nome.includes(q) ||
           contato.includes(q) ||
@@ -1959,7 +1964,7 @@ export default function ChatPage() {
         (b.created_at ? Date.parse(b.created_at) : 0);
       return bt - at;
     });
-  }, [contacts, lastMessages, searchQuery, conversaTab]);
+  }, [canViewContactPhone, contacts, lastMessages, searchQuery, conversaTab]);
 
   const visibleContactIds = useMemo(() => visibleContacts.map(c => c.id), [visibleContacts]);
 
@@ -2057,6 +2062,7 @@ export default function ChatPage() {
             ) : visibleContacts.map((contact) => {
               const ets = contatoEtiquetasMap[contact.id] || [];
               const unread = Number(unreadCounts[contact.id] || 0);
+              const displayName = formatContactDisplayName(String(contact.nome || ''), String(contact.contato || ''), canViewContactPhone);
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
@@ -2081,11 +2087,11 @@ export default function ChatPage() {
                 >
                   <Avatar>
                     <AvatarImage src={contact.profile_img_url || ''} />
-                    <AvatarFallback>{(contact.nome || 'C')[0]}</AvatarFallback>
+                    <AvatarFallback>{(displayName || 'C')[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="flex-1 min-w-0 font-semibold truncate">{contact.nome}</p>
+                      <p className="flex-1 min-w-0 font-semibold truncate">{displayName}</p>
                       <span className="shrink-0 w-[64px] text-right text-xs text-muted-foreground tabular-nums">{displayDate}</span>
                     </div>
                     {ets.length > 0 ? (
@@ -2232,7 +2238,11 @@ export default function ChatPage() {
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-bold">{selectedContact?.nome || 'Contato'}</h3>
+                <h3 className="font-bold">
+                  {selectedContact
+                    ? formatContactDisplayName(String(selectedContact.nome || ''), String(selectedContact.contato || ''), canViewContactPhone) || 'Contato'
+                    : 'Contato'}
+                </h3>
                 <div className="flex items-center gap-2">
                   <Badge variant={msgStatus === 'IA' ? "default" : "secondary"} className="text-[10px] h-4">
                     {msgStatus === 'IA' ? <Bot className="h-3 w-3 mr-1" /> : <User className="h-3 w-3 mr-1" />}
@@ -3126,9 +3136,11 @@ export default function ChatPage() {
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{selectedContact.nome}</div>
+                  <div className="font-semibold truncate">
+                    {formatContactDisplayName(String(selectedContact.nome || ''), String(selectedContact.contato || ''), canViewContactPhone)}
+                  </div>
                   <div className="text-sm text-muted-foreground truncate">
-                    {String(selectedContact.contato || '').replace('@s.whatsapp.net', '')}
+                    {formatContactDisplay(String(selectedContact.contato || ''), canViewContactPhone)}
                   </div>
                 </div>
               </div>
@@ -3144,25 +3156,27 @@ export default function ChatPage() {
               </div>
 
               {selectedContact.resumo ? (
-                <div className="rounded-lg border bg-card p-3 text-sm whitespace-pre-wrap">
+                <div className="rounded-lg border bg-card p-3 text-sm whitespace-pre-wrap break-all overflow-hidden">
                   {selectedContact.resumo}
                 </div>
               ) : null}
 
               <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(String(selectedContact.contato || '').replace('@s.whatsapp.net', ''));
-                      toast({ title: 'Copiado', description: 'Número copiado.' });
-                    } catch {
-                      toast({ title: 'Erro', description: 'Não foi possível copiar.', variant: 'destructive' });
-                    }
-                  }}
-                >
-                  Copiar número
-                </Button>
+                {canViewContactPhone ? (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(String(selectedContact.contato || '').replace('@s.whatsapp.net', ''));
+                        toast({ title: 'Copiado', description: 'Número copiado.' });
+                      } catch {
+                        toast({ title: 'Erro', description: 'Não foi possível copiar.', variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    Copiar número
+                  </Button>
+                ) : null}
                 <Button
                   variant="destructive"
                   onClick={async () => {
@@ -3211,7 +3225,7 @@ export default function ChatPage() {
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{etiquetasContact.nome}</div>
                   <div className="text-sm text-muted-foreground truncate">
-                    {String(etiquetasContact.contato || '').replace('@s.whatsapp.net', '')}
+                    {formatContactDisplay(String(etiquetasContact.contato || ''), canViewContactPhone)}
                   </div>
                 </div>
               </div>
@@ -3451,10 +3465,10 @@ export default function ChatPage() {
             type="button"
             className="w-full text-left text-sm px-2 py-2 rounded-md hover:bg-accent"
             onClick={() => {
-              toast({
-                title: 'Detalhes do contato',
-                description: `${contactMenuContact.nome} • ${contactMenuContact.contato}`,
-              });
+              setSelectedContact(contactMenuContact);
+              setMsgStatus(contactMenuContact.atendimento_mode === 'humano' ? 'Humano' : 'IA');
+              if (isMobile) setMobilePane('chat');
+              setInfoOpen(true);
               closeContactMenu();
             }}
           >

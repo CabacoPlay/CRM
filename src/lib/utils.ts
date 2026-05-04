@@ -9,6 +9,45 @@ export function formatContactName(name: string): string {
   return name.replace(/@s\.whatsapp\.net$/, '');
 }
 
+export function normalizeContactDigits(input: string): string {
+  return String(input || '').replace(/@s\.whatsapp\.net$/i, '').replace(/\D/g, '');
+}
+
+export function maskContactNumber(input: string): string {
+  const digits = normalizeContactDigits(input);
+  if (!digits) return '—';
+  if (digits.length <= 4) return `${'*'.repeat(digits.length)}`;
+  const prefix = digits.slice(0, Math.min(2, digits.length));
+  const suffix = digits.slice(-4);
+  return `${prefix}*****${suffix}`;
+}
+
+export function formatContactDisplay(input: string, canViewPhone: boolean): string {
+  if (canViewPhone) return formatContactName(input);
+  return maskContactNumber(input);
+}
+
+export function isLikelyPhoneLabel(input: string): boolean {
+  const raw = String(input || '').trim();
+  if (!raw) return false;
+  const digits = normalizeContactDigits(raw);
+  if (!digits) return false;
+  if (digits.length < 8) return false;
+  const non = raw.replace(/[0-9+\s().-]/g, '');
+  return non.length === 0;
+}
+
+export function formatContactDisplayName(name: string, contato: string, canViewPhone: boolean): string {
+  const raw = String(name || '').trim();
+  if (canViewPhone) return formatContactName(raw);
+  const rawDigits = normalizeContactDigits(raw);
+  const contatoDigits = normalizeContactDigits(contato);
+  if (!raw) return 'Contato';
+  if (rawDigits && contatoDigits && rawDigits === contatoDigits) return 'Contato';
+  if (isLikelyPhoneLabel(raw)) return 'Contato';
+  return raw;
+}
+
 export type ResolvedTheme = "light" | "dark";
 
 export function resolveTheme(theme: "light" | "dark" | "system"): ResolvedTheme {

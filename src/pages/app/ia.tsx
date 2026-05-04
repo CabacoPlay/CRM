@@ -20,6 +20,7 @@ import { IA, FAQ, Connection } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import { Navigate } from 'react-router-dom';
 const SkeletonCard = () => <Card>
     <CardHeader>
       <Skeleton className="h-6 w-3/4" />
@@ -49,6 +50,9 @@ export default function IAPage() {
   const {
     user
   } = useAuth();
+  if (user?.papel === 'colaborador' && !user.can_access_ia) {
+    return <Navigate to="/app/chat" replace />;
+  }
   const [ias, setIas] = useState<IA[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);

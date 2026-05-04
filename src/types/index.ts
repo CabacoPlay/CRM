@@ -129,8 +129,13 @@ export interface Usuario {
   telefone: string;
   email: string;
   empresa_id: string;
-  papel: 'owner' | 'admin' | 'cliente';
+  papel: 'owner' | 'admin' | 'cliente' | 'colaborador';
   avatar_url?: string;
+  can_view_contact_phone?: boolean;
+  can_access_ia?: boolean;
+  can_access_catalogo?: boolean;
+  can_access_catalogo_publico?: boolean;
+  can_access_orcamentos?: boolean;
 }
 
 export interface BrandingConfig {

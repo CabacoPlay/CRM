@@ -52,6 +52,15 @@ type UsuarioRow = {
   papel: string;
 };
 
+type UsuarioPermRow = {
+  user_id: string;
+  can_view_contact_phone: boolean;
+  can_access_ia: boolean;
+  can_access_catalogo: boolean;
+  can_access_catalogo_publico: boolean;
+  can_access_orcamentos: boolean;
+};
+
 const weekdayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const weekdayLabels: Record<(typeof weekdayKeys)[number], string> = {
   mon: 'Segunda',
@@ -86,11 +95,13 @@ export default function ConfiguracoesPage() {
   const { toast } = useToast();
 
   const empresaId = user?.empresa_id || null;
+  const canManagePermissions = user?.papel !== 'colaborador';
 
   const [empresa, setEmpresa] = useState<EmpresaRow | null>(null);
   const [settings, setSettings] = useState<EmpresaSettingsRow | null>(null);
   const [etiquetas, setEtiquetas] = useState<EtiquetaRow[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
+  const [userPerms, setUserPerms] = useState<Record<string, UsuarioPermRow>>({});
 
   const [newEtiquetaNome, setNewEtiquetaNome] = useState('');
   const [newEtiquetaCor, setNewEtiquetaCor] = useState('#3B82F6');
@@ -150,6 +161,23 @@ export default function ConfiguracoesPage() {
         .eq('empresa_id', empresaId)
         .order('nome', { ascending: true });
       setUsuarios((usuariosData || []) as any);
+
+      const { data: permsData } = await sb
+        .from('usuario_permissoes')
+        .select('user_id,can_view_contact_phone,can_access_ia,can_access_catalogo,can_access_catalogo_publico,can_access_orcamentos')
+        .eq('empresa_id', empresaId);
+      const map: Record<string, UsuarioPermRow> = {};
+      ((permsData || []) as UsuarioPermRow[]).forEach((p) => {
+        map[String(p.user_id)] = {
+          user_id: String(p.user_id),
+          can_view_contact_phone: Boolean(p.can_view_contact_phone),
+          can_access_ia: Boolean(p.can_access_ia),
+          can_access_catalogo: Boolean(p.can_access_catalogo),
+          can_access_catalogo_publico: Boolean(p.can_access_catalogo_publico),
+          can_access_orcamentos: Boolean(p.can_access_orcamentos),
+        };
+      });
+      setUserPerms(map);
     };
 
     load();
@@ -298,12 +326,13 @@ export default function ConfiguracoesPage() {
         </div>
 
         <Tabs defaultValue="conta" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
             <TabsTrigger value="conta">Conta</TabsTrigger>
             <TabsTrigger value="atendimento">Atendimento</TabsTrigger>
             <TabsTrigger value="conexoes">Conexões</TabsTrigger>
             <TabsTrigger value="etiquetas">Etiquetas</TabsTrigger>
             <TabsTrigger value="atribuicoes">Atribuições</TabsTrigger>
+            {canManagePermissions ? <TabsTrigger value="permissoes">Permissões</TabsTrigger> : null}
           </TabsList>
 
           <TabsContent value="conta">
@@ -651,7 +680,18 @@ export default function ConfiguracoesPage() {
                           <div className="font-medium truncate">{u.nome}</div>
                           <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                         </div>
-                        <Badge variant="secondary" className="capitalize">{u.papel}</Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`capitalize ${
+                            String(u.papel) === 'admin'
+                              ? 'bg-red-600 text-white hover:bg-red-600 border-red-600'
+                              : String(u.papel) === 'colaborador'
+                                ? 'bg-orange-500 text-white hover:bg-orange-500 border-orange-500'
+                                : ''
+                          }`}
+                        >
+                          {String(u.papel) === 'admin' ? 'Admin' : String(u.papel) === 'colaborador' ? 'Colaborador' : 'Cliente'}
+                        </Badge>
                       </div>
                     ))
                   )}
@@ -659,6 +699,82 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {canManagePermissions ? (
+            <TabsContent value="permissoes">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Permissões de colaboradores</CardTitle>
+                  <CardDescription>Controle o que cada colaborador pode ver e fazer.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {usuarios.filter(u => String(u.papel) === 'colaborador').length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Nenhum colaborador encontrado para esta empresa.</div>
+                  ) : (
+                    usuarios
+                      .filter(u => String(u.papel) === 'colaborador')
+                      .map((u) => {
+                        const perm = userPerms[u.id] || {
+                          user_id: u.id,
+                          can_view_contact_phone: false,
+                          can_access_ia: false,
+                          can_access_catalogo: false,
+                          can_access_catalogo_publico: false,
+                          can_access_orcamentos: false,
+                        };
+                        const save = async (patch: Partial<UsuarioPermRow>) => {
+                          if (!empresaId) return;
+                          const next = { ...perm, ...patch };
+                          setUserPerms(prev => ({ ...prev, [u.id]: next }));
+                          const { error } = await sb
+                            .from('usuario_permissoes')
+                            .upsert(
+                              { empresa_id: empresaId, ...next } as any,
+                              { onConflict: 'empresa_id,user_id' }
+                            );
+                          if (error) {
+                            setUserPerms(prev => ({ ...prev, [u.id]: perm }));
+                            toast({ title: 'Erro', description: 'Não foi possível salvar permissões.', variant: 'destructive' });
+                          } else {
+                            toast({ title: 'Salvo', description: 'Permissões atualizadas.' });
+                          }
+                        };
+                        return (
+                        <div key={u.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{u.nome}</div>
+                            <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 items-center">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">Ver telefone</div>
+                              <Switch checked={perm.can_view_contact_phone} onCheckedChange={(checked) => void save({ can_view_contact_phone: checked })} />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">Minha IA</div>
+                              <Switch checked={perm.can_access_ia} onCheckedChange={(checked) => void save({ can_access_ia: checked })} />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">Catálogo</div>
+                              <Switch checked={perm.can_access_catalogo} onCheckedChange={(checked) => void save({ can_access_catalogo: checked })} />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">Link Catálogo</div>
+                              <Switch checked={perm.can_access_catalogo_publico} onCheckedChange={(checked) => void save({ can_access_catalogo_publico: checked })} />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">Orçamentos</div>
+                              <Switch checked={perm.can_access_orcamentos} onCheckedChange={(checked) => void save({ can_access_orcamentos: checked })} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                      })
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ) : null}
         </Tabs>
       </div>
     </AppLayout>
