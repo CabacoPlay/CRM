@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
@@ -14,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { ConexoesContent } from '@/pages/app/conexoes';
+import { normalizePlan, planLabel, planLimits } from '@/lib/billing-plans';
 
 const sb: any = supabase;
 
@@ -110,6 +112,10 @@ export default function ConfiguracoesPage() {
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [collabModalOpen, setCollabModalOpen] = useState(false);
+  const [collabSubmitting, setCollabSubmitting] = useState(false);
+  const [collabError, setCollabError] = useState<string | null>(null);
+  const [collabForm, setCollabForm] = useState({ nome: '', email: '', telefone: '' });
 
   const timezones = useMemo(() => ['America/Sao_Paulo', 'America/Manaus', 'America/Fortaleza', 'UTC'], []);
 
@@ -315,6 +321,124 @@ export default function ConfiguracoesPage() {
       return;
     }
     setEtiquetas(prev => prev.map(e => e.id === id ? { ...e, ...updates } as any : e));
+  };
+
+  const fetchPlanAndUserCount = async () => {
+    if (!empresaId) return { plan: normalizePlan(null), count: 0 };
+    const { data: empresaData, error: empresaError } = await supabase
+      .from('empresas')
+      .select('billing_plan')
+      .eq('id', empresaId)
+      .maybeSingle();
+
+    if (empresaError) throw empresaError;
+
+    const { count, error: usersError } = await supabase
+      .from('usuarios')
+      .select('id', { count: 'exact', head: true })
+      .eq('empresa_id', empresaId)
+      .neq('papel', 'admin');
+
+    if (usersError) throw usersError;
+
+    return { plan: normalizePlan((empresaData as any)?.billing_plan ?? null), count: count ?? 0 };
+  };
+
+  const createColaborador = async () => {
+    if (!empresaId) return;
+    const nome = collabForm.nome.trim();
+    const email = collabForm.email.trim();
+    const telefone = collabForm.telefone.trim();
+
+    if (!nome || !email) {
+      setCollabError('Nome e email são obrigatórios.');
+      return;
+    }
+
+    try {
+      setCollabSubmitting(true);
+      setCollabError(null);
+
+      const fresh = await fetchPlanAndUserCount();
+      const limits = planLimits(fresh.plan);
+      if (fresh.count >= limits.users) {
+        setCollabError(`Limite do plano ${planLabel(fresh.plan)} atingido (${limits.users} usuários).`);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('usuarios')
+        .insert({
+          nome,
+          email,
+          telefone: telefone || null,
+          empresa_id: empresaId,
+          papel: 'colaborador',
+        } as any)
+        .select('id,nome,email,papel')
+        .single();
+
+      if (error) {
+        if (String((error as any).code) === '23505' && String((error as any).message || '').includes('email')) {
+          setCollabError('Já existe um usuário com este email.');
+          return;
+        }
+        throw error;
+      }
+
+      setUsuarios(prev => [...prev, data as any].sort((a: any, b: any) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+      setUserPerms(prev => ({
+        ...prev,
+        [String((data as any).id)]: {
+          user_id: String((data as any).id),
+          can_view_contact_phone: false,
+          can_access_ia: false,
+          can_access_catalogo: false,
+          can_access_catalogo_publico: false,
+          can_access_orcamentos: false,
+        }
+      }));
+
+      setCollabForm({ nome: '', email: '', telefone: '' });
+      setCollabModalOpen(false);
+      toast({ title: 'Criado', description: 'Colaborador adicionado à empresa.' });
+    } catch {
+      setCollabError('Não foi possível adicionar colaborador.');
+      toast({ title: 'Erro', description: 'Não foi possível adicionar colaborador.', variant: 'destructive' });
+    } finally {
+      setCollabSubmitting(false);
+    }
+  };
+
+  const removeColaborador = async (usuario: UsuarioRow) => {
+    if (!empresaId) return;
+    if (String(usuario.papel) !== 'colaborador') return;
+    if (!confirm(`Remover o colaborador "${usuario.nome}" desta empresa?`)) return;
+
+    try {
+      setCollabSubmitting(true);
+      setCollabError(null);
+      await sb.from('usuario_permissoes').delete().eq('empresa_id', empresaId).eq('user_id', usuario.id);
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id', usuario.id)
+        .eq('empresa_id', empresaId)
+        .eq('papel', 'colaborador');
+      if (error) throw error;
+
+      setUsuarios(prev => prev.filter(u => u.id !== usuario.id));
+      setUserPerms(prev => {
+        const next = { ...prev };
+        delete next[String(usuario.id)];
+        return next;
+      });
+      toast({ title: 'Removido', description: 'Colaborador removido.' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível remover colaborador.', variant: 'destructive' });
+    } finally {
+      setCollabSubmitting(false);
+    }
   };
 
   return (
@@ -704,8 +828,23 @@ export default function ConfiguracoesPage() {
             <TabsContent value="permissoes">
               <Card>
                 <CardHeader>
-                  <CardTitle>Permissões de colaboradores</CardTitle>
-                  <CardDescription>Controle o que cada colaborador pode ver e fazer.</CardDescription>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>Permissões de colaboradores</CardTitle>
+                      <CardDescription>Controle o que cada colaborador pode ver e fazer.</CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setCollabError(null);
+                        setCollabModalOpen(true);
+                      }}
+                      disabled={!empresaId}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar colaborador
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {usuarios.filter(u => String(u.papel) === 'colaborador').length === 0 ? (
@@ -745,27 +884,38 @@ export default function ConfiguracoesPage() {
                             <div className="font-medium truncate">{u.nome}</div>
                             <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 items-center">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground whitespace-nowrap">Ver telefone</div>
-                              <Switch checked={perm.can_view_contact_phone} onCheckedChange={(checked) => void save({ can_view_contact_phone: checked })} />
+                          <div className="flex items-center gap-3">
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-2 items-center">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">Ver telefone</div>
+                                <Switch checked={perm.can_view_contact_phone} onCheckedChange={(checked) => void save({ can_view_contact_phone: checked })} />
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">Minha IA</div>
+                                <Switch checked={perm.can_access_ia} onCheckedChange={(checked) => void save({ can_access_ia: checked })} />
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">Catálogo</div>
+                                <Switch checked={perm.can_access_catalogo} onCheckedChange={(checked) => void save({ can_access_catalogo: checked })} />
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">Link Catálogo</div>
+                                <Switch checked={perm.can_access_catalogo_publico} onCheckedChange={(checked) => void save({ can_access_catalogo_publico: checked })} />
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">Orçamentos</div>
+                                <Switch checked={perm.can_access_orcamentos} onCheckedChange={(checked) => void save({ can_access_orcamentos: checked })} />
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground whitespace-nowrap">Minha IA</div>
-                              <Switch checked={perm.can_access_ia} onCheckedChange={(checked) => void save({ can_access_ia: checked })} />
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground whitespace-nowrap">Catálogo</div>
-                              <Switch checked={perm.can_access_catalogo} onCheckedChange={(checked) => void save({ can_access_catalogo: checked })} />
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground whitespace-nowrap">Link Catálogo</div>
-                              <Switch checked={perm.can_access_catalogo_publico} onCheckedChange={(checked) => void save({ can_access_catalogo_publico: checked })} />
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-xs text-muted-foreground whitespace-nowrap">Orçamentos</div>
-                              <Switch checked={perm.can_access_orcamentos} onCheckedChange={(checked) => void save({ can_access_orcamentos: checked })} />
-                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void removeColaborador(u)}
+                              disabled={collabSubmitting}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Remover
+                            </Button>
                           </div>
                         </div>
                       );
@@ -777,6 +927,67 @@ export default function ConfiguracoesPage() {
           ) : null}
         </Tabs>
       </div>
+
+      <Dialog
+        open={collabModalOpen}
+        onOpenChange={(open) => {
+          setCollabModalOpen(open);
+          if (!open) {
+            setCollabForm({ nome: '', email: '', telefone: '' });
+            setCollabError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar colaborador</DialogTitle>
+            <DialogDescription>Cria um usuário colaborador nesta empresa.</DialogDescription>
+          </DialogHeader>
+
+          {collabError ? (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              {collabError}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3">
+            <div className="grid gap-1">
+              <Label>Nome *</Label>
+              <Input
+                value={collabForm.nome}
+                onChange={(e) => setCollabForm(prev => ({ ...prev, nome: e.target.value }))}
+                disabled={collabSubmitting}
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                value={collabForm.email}
+                onChange={(e) => setCollabForm(prev => ({ ...prev, email: e.target.value }))}
+                disabled={collabSubmitting}
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label>Telefone (opcional)</Label>
+              <Input
+                value={collabForm.telefone}
+                onChange={(e) => setCollabForm(prev => ({ ...prev, telefone: e.target.value }))}
+                disabled={collabSubmitting}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCollabModalOpen(false)} disabled={collabSubmitting}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void createColaborador()} disabled={collabSubmitting}>
+              {collabSubmitting ? 'Criando...' : 'Adicionar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
