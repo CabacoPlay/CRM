@@ -63,6 +63,7 @@ type Contato = {
   ai_session_closed_at?: string | null;
   ai_session_updated_at?: string | null;
   atendimento_mode?: 'ia' | 'humano' | null;
+  assigned_user_id?: string | null;
   conversa_status?: 'aberta' | 'resolvida' | null;
   conversa_resolvida_em?: string | null;
   conversa_resolvida_por?: string | null;
@@ -319,6 +320,9 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [lastMessages, setLastMessages] = useState<Record<string, { conteudo: string; created_at: string; tipo?: Mensagem['tipo'] | null; mimetype?: string | null; file_name?: string | null; media_url?: string | null }>>({});
   const [mediaDurations, setMediaDurations] = useState<Record<string, number>>({});
+  const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
+  const userNamesRef = useRef<Record<string, string>>({});
+  const [sendConflictOpen, setSendConflictOpen] = useState(false);
   const durationInflightRef = useRef<Set<string>>(new Set());
   const [dragActive, setDragActive] = useState(false);
   const dragDepthRef = useRef(0);
@@ -449,13 +453,51 @@ export default function ChatPage() {
   const [contactDeleteConfirmOpen, setContactDeleteConfirmOpen] = useState(false);
   const [pendingDeleteContactId, setPendingDeleteContactId] = useState<string | null>(null);
 
-  const setContactMode = async (contactId: string, mode: 'ia' | 'humano') => {
-    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, atendimento_mode: mode } : c));
+  useEffect(() => {
+    userNamesRef.current = userNamesById;
+  }, [userNamesById]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const name = String(user?.nome || '').trim();
+    if (!name) return;
+    setUserNamesById((prev) => (prev[user.id] ? prev : { ...prev, [user.id]: name }));
+  }, [user?.id, user?.nome]);
+
+  useEffect(() => {
+    const loadAssignedUsers = async () => {
+      if (!empresaId) return;
+      if (contacts.length === 0) return;
+      const ids = Array.from(new Set(contacts.map(c => c.assigned_user_id).filter((v): v is string => Boolean(v && String(v).trim()))));
+      const missing = ids.filter((id) => !userNamesRef.current[id]);
+      if (missing.length === 0) return;
+      const { data, error } = await sb
+        .from('usuarios')
+        .select('id,nome')
+        .eq('empresa_id', empresaId)
+        .in('id', missing);
+      if (error) return;
+      const rows = (data || []) as Array<{ id: string; nome: string }>;
+      if (rows.length === 0) return;
+      setUserNamesById((prev) => {
+        const next = { ...prev };
+        rows.forEach((r) => {
+          next[String(r.id)] = String(r.nome || '').trim() || String(r.id);
+        });
+        return next;
+      });
+    };
+    void loadAssignedUsers();
+  }, [empresaId, contacts]);
+
+  const setContactMode = async (contactId: string, mode: 'ia' | 'humano', assignedUserId?: string | null) => {
+    const assigned = mode === 'humano' ? (assignedUserId ?? user?.id ?? null) : null;
+    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, atendimento_mode: mode, assigned_user_id: assigned } : c));
     if (selectedContact?.id === contactId) {
-      setSelectedContact(prev => prev ? { ...prev, atendimento_mode: mode } : prev);
+      setSelectedContact(prev => prev ? { ...prev, atendimento_mode: mode, assigned_user_id: assigned } : prev);
     }
     setMsgStatus(mode === 'ia' ? 'IA' : 'Humano');
-    await sb.from('contatos').update({ atendimento_mode: mode }).eq('id', contactId);
+    await sb.from('contatos').update({ atendimento_mode: mode, assigned_user_id: assigned }).eq('id', contactId);
   };
 
   const initials = useMemo(() => {
@@ -1377,6 +1419,13 @@ export default function ChatPage() {
   }, [contacts, initialContactId, selectedContact?.id]);
 
   useEffect(() => {
+    if (!selectedContact?.id) return;
+    const fresh = contacts.find(c => c.id === selectedContact.id) || null;
+    if (!fresh) return;
+    setSelectedContact(fresh);
+  }, [contacts, selectedContact?.id]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (scheduleOpen || quickRepliesOpen || infoOpen || etiquetasOpen || forwardOpen || contactDeleteConfirmOpen || catalogOpen) {
@@ -1621,8 +1670,17 @@ export default function ChatPage() {
     loadScheduled();
   }, [scheduleOpen, scheduleView, selectedContact?.id]);
 
-  const handleSend = async () => {
+  const handleSend = async (force = false) => {
     if (!pendingText.trim() || !empresaId || !selectedContact) return;
+    const assignedId = String(selectedContact.assigned_user_id || '').trim();
+    const isHuman = (selectedContact.atendimento_mode || 'ia') === 'humano';
+    if (!force && isHuman && assignedId && user?.id && assignedId !== user.id) {
+      setSendConflictOpen(true);
+      return;
+    }
+    if (user?.id && (!isHuman || !assignedId)) {
+      await setContactMode(selectedContact.id, 'humano', user.id);
+    }
     const baseText = pendingText.trim();
     const replyPreview = replyTo ? getMessageSnippet(replyTo) : null;
     const replyExternalId = replyTo ? (replyTo.external_id || null) : null;
@@ -1829,6 +1887,13 @@ export default function ChatPage() {
 
   const sendStickerDataUrl = async (dataUrl: string) => {
     if (!empresaId || !selectedContact) return;
+    if (user?.id) {
+      const assignedId = String(selectedContact.assigned_user_id || '').trim();
+      const isHuman = (selectedContact.atendimento_mode || 'ia') === 'humano';
+      if (!isHuman || !assignedId) {
+        await setContactMode(selectedContact.id, 'humano', user.id);
+      }
+    }
 
     const optimistic: Mensagem = {
       id: crypto.randomUUID(),
@@ -2063,6 +2128,9 @@ export default function ChatPage() {
               const ets = contatoEtiquetasMap[contact.id] || [];
               const unread = Number(unreadCounts[contact.id] || 0);
               const displayName = formatContactDisplayName(String(contact.nome || ''), String(contact.contato || ''), canViewContactPhone);
+              const assignedId = String(contact.assigned_user_id || '').trim();
+              const assignedName = assignedId ? (userNamesById[assignedId] || '—') : null;
+              const mode = (contact.atendimento_mode || 'ia') === 'humano' ? 'Humano' : 'IA';
               const displayDate = lastMessages[contact.id]?.created_at
                 ? new Date(lastMessages[contact.id].created_at).toLocaleDateString('pt-BR')
                 : new Date(contact.updated_at || contact.created_at || '').toLocaleDateString('pt-BR');
@@ -2093,6 +2161,20 @@ export default function ChatPage() {
                     <div className="flex items-start justify-between gap-2">
                       <p className="flex-1 min-w-0 font-semibold truncate">{displayName}</p>
                       <span className="shrink-0 w-[64px] text-right text-xs text-muted-foreground tabular-nums">{displayDate}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          "min-w-0 max-w-[280px] truncate inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                          mode === 'IA'
+                            ? "bg-muted text-muted-foreground border-border"
+                            : assignedId
+                              ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                              : "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                        )}
+                      >
+                        {mode === 'IA' ? 'IA' : `Humano • ${assignedName || 'Sem responsável'}`}
+                      </span>
                     </div>
                     {ets.length > 0 ? (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -2248,6 +2330,20 @@ export default function ChatPage() {
                     {msgStatus === 'IA' ? <Bot className="h-3 w-3 mr-1" /> : <User className="h-3 w-3 mr-1" />}
                     Atendimento {msgStatus}
                   </Badge>
+                  {msgStatus === 'Humano' ? (
+                    <span
+                      className={cn(
+                        "min-w-0 max-w-[260px] truncate inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        selectedContact?.assigned_user_id
+                          ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                          : "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                      )}
+                    >
+                      {selectedContact?.assigned_user_id
+                        ? `Em atendimento • ${userNamesById[String(selectedContact.assigned_user_id)] || '—'}`
+                        : 'Em atendimento • Sem responsável'}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -2268,19 +2364,22 @@ export default function ChatPage() {
                 size="sm"
                 onClick={() => {
                   if (!selectedContact) return;
-                  const next = (selectedContact.atendimento_mode === 'humano') ? 'ia' : 'humano';
-                  setContactMode(selectedContact.id, next);
+                  const isHuman = (selectedContact.atendimento_mode || 'ia') === 'humano';
+                  const hasAssignee = Boolean(String(selectedContact.assigned_user_id || '').trim());
+                  const next = (!isHuman || !hasAssignee) ? 'humano' : 'ia';
+                  void setContactMode(selectedContact.id, next);
                 }}
                 className={cn(
                   "hidden sm:flex",
                   msgStatus === 'Humano' ? "bg-primary text-primary-foreground" : ""
                 )}
               >
-                {msgStatus === 'IA' ? (
-                  <><UserCheck className="h-4 w-4 mr-2" /> Assumir Atendimento</>
-                ) : (
-                  <><Bot className="h-4 w-4 mr-2" /> Devolver para IA</>
-                )}
+                {(() => {
+                  const isHuman = msgStatus === 'Humano';
+                  const hasAssignee = Boolean(String(selectedContact?.assigned_user_id || '').trim());
+                  if (!isHuman || !hasAssignee) return <><UserCheck className="h-4 w-4 mr-2" /> Assumir Atendimento</>;
+                  return <><Bot className="h-4 w-4 mr-2" /> Devolver para IA</>;
+                })()}
               </Button>
               <Button variant="ghost" size="icon" onClick={() => setInfoOpen(true)}>
                 <Info className="h-4 w-4" />
@@ -2837,7 +2936,7 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
-              <Button size="icon" className="shrink-0 rounded-full" onClick={handleSend} disabled={!pendingText.trim() || !selectedContact}>
+              <Button size="icon" className="shrink-0 rounded-full" onClick={() => void handleSend()} disabled={!pendingText.trim() || !selectedContact}>
                 <Send className="h-5 w-5" />
               </Button>
             </div>
@@ -3149,6 +3248,13 @@ export default function ChatPage() {
                 <Badge variant={msgStatus === 'IA' ? 'default' : 'secondary'}>
                   {msgStatus === 'IA' ? 'IA' : 'Humano'}
                 </Badge>
+                {msgStatus !== 'IA' ? (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {selectedContact.assigned_user_id
+                      ? `• Em atendimento por ${userNamesById[String(selectedContact.assigned_user_id)] || '—'}`
+                      : '• Sem responsável'}
+                  </span>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                   Última atividade:{' '}
                   {new Date(selectedContact.updated_at || selectedContact.created_at || new Date().toISOString()).toLocaleString('pt-BR')}
@@ -3512,6 +3618,34 @@ export default function ChatPage() {
           </button>
         </div>
       )}
+
+      <Dialog open={sendConflictOpen} onOpenChange={setSendConflictOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Atendimento em andamento</DialogTitle>
+            <DialogDescription>
+              Este contato está em atendimento por{' '}
+              <span className="font-medium">
+                {selectedContact?.assigned_user_id ? (userNamesById[String(selectedContact.assigned_user_id)] || '—') : 'outro usuário'}
+              </span>
+              . Deseja enviar mesmo assim?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setSendConflictOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                setSendConflictOpen(false);
+                void handleSend(true);
+              }}
+            >
+              Enviar mesmo assim
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
