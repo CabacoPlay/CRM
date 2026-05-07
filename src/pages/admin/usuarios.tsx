@@ -43,6 +43,7 @@ export default function AdminUsuarios() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [fixingEmpresaPlan, setFixingEmpresaPlan] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,6 +139,30 @@ export default function AdminUsuarios() {
     const colaboradores = usuarios.filter(u => u.papel === 'colaborador').length;
     return { total, admins, clientes, colaboradores };
   }, [usuarios]);
+
+  const selectedEmpresa = useMemo(() => {
+    if (!formData.empresa_id) return null;
+    return empresas.find(e => e.id === formData.empresa_id) || null;
+  }, [empresas, formData.empresa_id]);
+
+  const updateEmpresaPlan = async (nextPlan: 'free' | 'basic' | 'pro') => {
+    if (!formData.empresa_id) return;
+    try {
+      setFixingEmpresaPlan(true);
+      const { error } = await supabase
+        .from('empresas')
+        .update({ billing_plan: nextPlan } as any)
+        .eq('id', formData.empresa_id);
+      if (error) throw error;
+      setEmpresas(prev => prev.map(e => e.id === formData.empresa_id ? { ...e, billing_plan: nextPlan } : e));
+      setFormError('');
+      toast({ title: 'Atualizado', description: `Plano da empresa definido como ${planLabel(nextPlan)}.` });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o plano da empresa.', variant: 'destructive' });
+    } finally {
+      setFixingEmpresaPlan(false);
+    }
+  };
 
   const fetchEmpresaPlanAndUserCount = async (empresaId: string, excludeUserId?: string) => {
     const { data: empresaData, error: empresaError } = await supabase
@@ -636,6 +661,28 @@ export default function AdminUsuarios() {
               {formError && (
                 <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
                   {formError}
+                  {formData.papel !== 'admin' && formData.empresa_id && normalizePlan(selectedEmpresa?.billing_plan ?? null) === 'free' ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void updateEmpresaPlan('basic')}
+                        disabled={submitting || fixingEmpresaPlan}
+                      >
+                        Definir Basic
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void updateEmpresaPlan('pro')}
+                        disabled={submitting || fixingEmpresaPlan}
+                      >
+                        Definir Pro
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )}
               

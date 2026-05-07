@@ -610,14 +610,16 @@ export default function AdminEmpresas() {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0 space-y-3">
-                        {empresa.billing_enabled ? (
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>
-                              Plano: {planLabel(empresa.billing_plan)} ({planLimits(empresa.billing_plan).instances} inst / {planLimits(empresa.billing_plan).users} usuários)
-                            </span>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Plano: {planLabel(empresa.billing_plan)} ({planLimits(empresa.billing_plan).instances} inst / {planLimits(empresa.billing_plan).users} usuários)
+                          </span>
+                          {empresa.billing_enabled ? (
                             <span>Venc: {empresa.billing_due_date ? String(empresa.billing_due_date) : '—'}</span>
-                          </div>
-                        ) : null}
+                          ) : (
+                            <span>Venc: —</span>
+                          )}
+                        </div>
                         <div className="grid gap-2 text-sm">
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <User className="h-4 w-4" />

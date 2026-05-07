@@ -26,6 +26,7 @@ type EmpresaRow = {
   responsavel: string | null;
   ativa: boolean;
   logo_url?: string | null;
+  billing_plan?: string | null;
 };
 
 type EmpresaSettingsRow = {
@@ -125,7 +126,7 @@ export default function ConfiguracoesPage() {
 
       const { data: empresaData } = await supabase
         .from('empresas')
-        .select('id,nome,telefone,responsavel,ativa,logo_url')
+        .select('id,nome,telefone,responsavel,ativa,logo_url,billing_plan')
         .eq('id', empresaId)
         .maybeSingle();
       setEmpresa((empresaData || null) as any);
@@ -555,6 +556,10 @@ export default function ConfiguracoesPage() {
                   <div className="grid gap-1">
                     <Label>Responsável</Label>
                     <Input value={empresa?.responsavel || ''} disabled />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label>Plano</Label>
+                    <Input value={planLabel(empresa?.billing_plan ?? 'free')} disabled />
                   </div>
                 </CardContent>
               </Card>
