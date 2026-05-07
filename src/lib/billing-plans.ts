@@ -34,6 +34,9 @@ export const BILLING_PLANS: Record<BillingPlan, BillingPlanConfig> = {
 export function normalizePlan(value: string | null | undefined): BillingPlan {
   const v = String(value || '').toLowerCase().trim();
   if (v === 'basic' || v === 'pro' || v === 'free') return v;
+  if (v.includes('pro') || v.includes('premium') || v.includes('prof')) return 'pro';
+  if (v.includes('basic') || v.includes('bás') || v.includes('bas')) return 'basic';
+  if (v.includes('free') || v.includes('grat')) return 'free';
   return 'free';
 }
 
