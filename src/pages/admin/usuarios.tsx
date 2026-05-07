@@ -89,6 +89,7 @@ export default function AdminUsuarios() {
         responsavel: empresa.responsavel || '',
         ativa: empresa.ativa,
         created_at: empresa.created_at,
+        billing_plan: empresa.billing_plan ?? null,
       }));
       
       setEmpresas(mappedEmpresas);
@@ -138,6 +139,31 @@ export default function AdminUsuarios() {
     return { total, admins, clientes, colaboradores };
   }, [usuarios]);
 
+  const fetchEmpresaPlanAndUserCount = async (empresaId: string, excludeUserId?: string) => {
+    const { data: empresaData, error: empresaError } = await supabase
+      .from('empresas')
+      .select('billing_plan')
+      .eq('id', empresaId)
+      .maybeSingle();
+
+    if (empresaError) throw empresaError;
+
+    let usersQuery = supabase
+      .from('usuarios')
+      .select('id', { count: 'exact', head: true })
+      .eq('empresa_id', empresaId)
+      .neq('papel', 'admin');
+
+    if (excludeUserId) {
+      usersQuery = usersQuery.neq('id', excludeUserId);
+    }
+
+    const { count, error: usersError } = await usersQuery;
+    if (usersError) throw usersError;
+
+    return { plan: normalizePlan(empresaData?.billing_plan ?? null), count: count ?? 0 };
+  };
+
   const handleCreate = async () => {
     if (!formData.nome.trim() || !formData.email.trim()) {
       setFormError('Nome e email são obrigatórios');
@@ -155,10 +181,18 @@ export default function AdminUsuarios() {
       setFormError('');
 
       if (formData.papel !== 'admin' && formData.empresa_id) {
-        const empresa = empresas.find(e => e.id === formData.empresa_id) || null;
-        const plan = normalizePlan(empresa?.billing_plan);
+        let plan = normalizePlan(null);
+        let countLocal = usuarios.filter(u => u.empresa_id === formData.empresa_id && u.papel !== 'admin').length;
+        try {
+          const fresh = await fetchEmpresaPlanAndUserCount(formData.empresa_id);
+          plan = fresh.plan;
+          countLocal = fresh.count;
+        } catch {
+          const empresa = empresas.find(e => e.id === formData.empresa_id) || null;
+          plan = normalizePlan(empresa?.billing_plan ?? null);
+        }
+
         const limits = planLimits(plan);
-        const countLocal = usuarios.filter(u => u.empresa_id === formData.empresa_id && u.papel !== 'admin').length;
         if (countLocal >= limits.users) {
           setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
           setSubmitting(false);
@@ -242,10 +276,18 @@ export default function AdminUsuarios() {
       const prevEmpresaId = editingUsuario.empresa_id || null;
       const empresaChanged = nextEmpresaId !== prevEmpresaId;
       if (formData.papel !== 'admin' && nextEmpresaId && (empresaChanged || editingUsuario.papel === 'admin')) {
-        const empresa = empresas.find(e => e.id === nextEmpresaId) || null;
-        const plan = normalizePlan(empresa?.billing_plan);
+        let plan = normalizePlan(null);
+        let countLocal = usuarios.filter(u => u.empresa_id === nextEmpresaId && u.papel !== 'admin' && u.id !== editingUsuario.id).length;
+        try {
+          const fresh = await fetchEmpresaPlanAndUserCount(nextEmpresaId, editingUsuario.id);
+          plan = fresh.plan;
+          countLocal = fresh.count;
+        } catch {
+          const empresa = empresas.find(e => e.id === nextEmpresaId) || null;
+          plan = normalizePlan(empresa?.billing_plan ?? null);
+        }
+
         const limits = planLimits(plan);
-        const countLocal = usuarios.filter(u => u.empresa_id === nextEmpresaId && u.papel !== 'admin' && u.id !== editingUsuario.id).length;
         if (countLocal >= limits.users) {
           setFormError(`Limite do plano ${planLabel(plan)} atingido (${limits.users} usuários).`);
           setSubmitting(false);
