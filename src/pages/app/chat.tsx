@@ -2085,7 +2085,7 @@ export default function ChatPage() {
         <div
           className={cn(
             "flex-col bg-card/50 md:border-r",
-            isMobile ? "w-full" : "w-[480px]",
+            isMobile ? "w-full" : "w-[560px] lg:w-[620px]",
             isMobile && mobilePane === "chat" ? "hidden" : "flex",
           )}
         >
@@ -2159,8 +2159,8 @@ export default function ChatPage() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="flex-1 min-w-0 font-semibold truncate">{displayName}</p>
-                      <span className="shrink-0 w-[64px] text-right text-xs text-muted-foreground tabular-nums">{displayDate}</span>
+                      <p className="flex-1 min-w-0 font-semibold leading-tight line-clamp-2">{displayName}</p>
+                      <span className="shrink-0 w-[56px] text-right text-xs text-muted-foreground tabular-nums">{displayDate}</span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 min-w-0">
                       <span
