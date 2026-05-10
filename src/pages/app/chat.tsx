@@ -1604,8 +1604,31 @@ export default function ChatPage() {
             media_url: m.media_url ?? null,
           }
         }));
-        // Scroll
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
+        if (m.direcao === 'in') {
+          const isViewing =
+            selectedContact?.id === m.contato_id &&
+            (!isMobile || mobilePane === 'chat') &&
+            document.visibilityState === 'visible';
+          if (!isViewing) {
+            setUnreadCounts((prev) => {
+              const cur = Number(prev[m.contato_id] || 0);
+              const next = Math.min(99, cur + 1);
+              return { ...prev, [m.contato_id]: next };
+            });
+          } else {
+            setUnreadCounts((prev) => {
+              if (!prev[m.contato_id]) return prev;
+              return { ...prev, [m.contato_id]: 0 };
+            });
+          }
+        }
+        const shouldScroll =
+          selectedContact?.id === m.contato_id &&
+          (!isMobile || mobilePane === 'chat') &&
+          document.visibilityState === 'visible';
+        if (shouldScroll) {
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mensagens', filter: `contato_id=eq.${selectedContact.id}` }, payload => {
         const updated = (payload.new as unknown) as Mensagem;
@@ -1616,7 +1639,7 @@ export default function ChatPage() {
     return () => {
       sb.removeChannel(ch);
     };
-  }, [empresaId, selectedContact?.id]);
+  }, [empresaId, isMobile, mobilePane, selectedContact?.id]);
 
   // Realtime global para atualizar a lista de conversas (preview) quando chegar mensagem nova
   useEffect(() => {
@@ -1626,6 +1649,7 @@ export default function ChatPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `empresa_id=eq.${empresaId}` }, payload => {
         const m = payload.new as unknown as Mensagem;
         if (!m?.contato_id) return;
+        if (selectedContact?.id === m.contato_id) return;
         const previewText = stripSignature(m.conteudo || '', m.sender_name || null);
         setLastMessages(prev => ({
           ...prev,
@@ -2032,11 +2056,12 @@ export default function ChatPage() {
   }, [canViewContactPhone, contacts, lastMessages, searchQuery, conversaTab]);
 
   const visibleContactIds = useMemo(() => visibleContacts.map(c => c.id), [visibleContacts]);
+  const visibleContactIdSetKey = useMemo(() => [...visibleContactIds].sort().join(','), [visibleContactIds]);
 
   useEffect(() => {
     if (!empresaId) return;
     loadEtiquetasForContacts(visibleContactIds);
-  }, [empresaId, visibleContactIds.join(',')]);
+  }, [empresaId, visibleContactIdSetKey]);
 
   useEffect(() => {
     const urls: string[] = [];
@@ -2076,7 +2101,7 @@ export default function ChatPage() {
       audio.addEventListener('error', onError);
       audio.src = url;
     });
-  }, [visibleContactIds.join(','), lastMessages, mediaDurations]);
+  }, [visibleContactIdSetKey, lastMessages, mediaDurations, visibleContacts]);
 
   return (
     <AppLayout>
